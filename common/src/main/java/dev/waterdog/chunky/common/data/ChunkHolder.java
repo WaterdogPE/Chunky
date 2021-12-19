@@ -15,9 +15,13 @@
 
 package dev.waterdog.chunky.common.data;
 
-public enum LoginState {
-    CONNECTING,
-    LOGIN,
-    SPAWNED,
-    CLOSED
+import lombok.Data;
+
+@Data
+public class ChunkHolder {
+
+    private final int chunkX;
+    private final int chunkZ;
+    private final int subChunksLength;
+
 }

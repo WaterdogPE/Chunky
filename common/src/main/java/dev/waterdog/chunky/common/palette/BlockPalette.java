@@ -13,11 +13,14 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.data;
+package dev.waterdog.chunky.common.palette;
 
-public enum LoginState {
-    CONNECTING,
-    LOGIN,
-    SPAWNED,
-    CLOSED
+import com.nukkitx.nbt.NbtMap;
+
+public interface BlockPalette {
+
+    int state2RuntimeId(NbtMap state);
+    NbtMap runtimeId2State(int runtimeId);
+
+    long getHash();
 }

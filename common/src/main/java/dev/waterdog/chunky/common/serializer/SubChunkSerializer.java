@@ -13,11 +13,13 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.data;
+package dev.waterdog.chunky.common.serializer;
 
-public enum LoginState {
-    CONNECTING,
-    LOGIN,
-    SPAWNED,
-    CLOSED
+import dev.waterdog.chunky.common.data.ChunkHolder;
+import dev.waterdog.chunky.common.data.PalettedStorage;
+import io.netty.buffer.ByteBuf;
+
+public interface SubChunkSerializer {
+
+    PalettedStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder);
 }

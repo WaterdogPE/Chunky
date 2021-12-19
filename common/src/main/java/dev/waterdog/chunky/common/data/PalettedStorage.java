@@ -15,9 +15,24 @@
 
 package dev.waterdog.chunky.common.data;
 
-public enum LoginState {
-    CONNECTING,
-    LOGIN,
-    SPAWNED,
-    CLOSED
+import com.nukkitx.nbt.NbtMap;
+import it.unimi.dsi.fastutil.ints.IntList;
+import lombok.Data;
+
+import java.util.List;
+
+@Data
+public class PalettedStorage {
+    private int paletteHeader;
+    private byte[] words;
+    private List<NbtMap> persistentPalette;
+    private IntList runtimePalette;
+
+    public int getBitsPerBlock() {
+        return this.paletteHeader >> 1;
+    }
+
+    public boolean isPersistent() {
+        return (this.paletteHeader & 0x01) == 0;
+    }
 }

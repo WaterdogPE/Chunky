@@ -22,9 +22,13 @@ import com.nukkitx.protocol.bedrock.BedrockPacketCodec;
 import com.nukkitx.protocol.bedrock.handler.BedrockPacketHandler;
 import com.nukkitx.protocol.bedrock.packet.*;
 import com.nukkitx.protocol.bedrock.util.EncryptionUtils;
+import dev.waterdog.chunky.common.data.ChunkHolder;
 import dev.waterdog.chunky.common.data.LoginData;
 import dev.waterdog.chunky.common.data.LoginState;
 import dev.waterdog.chunky.common.data.PeerClientData;
+import dev.waterdog.chunky.common.serializer.Serializers;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.EventLoop;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
@@ -73,11 +77,11 @@ public class ChunkyPeer implements BedrockPacketHandler {
 
     private void onConnected(BedrockClientSession session) {
         this.session = session;
-        // TODO: disconnect handler
+        session.addDisconnectHandler(reason -> this.close(reason.name()));
         session.setPacketHandler(this);
         session.setPacketCodec(this.loginData.getCodec());
         session.sendPacket(this.loginData.createLoginPacket());
-        log.info("[{}] started with login sequence", this.loginData.getIdentityData().getDisplayName());
+        log.info("[{}] started with login sequence", this.getDisplayName());
     }
 
     private void onLogin() {
@@ -88,7 +92,8 @@ public class ChunkyPeer implements BedrockPacketHandler {
         if (this.session != null && !this.session.isClosed()) {
             this.bedrockClient.close(false);
         }
-        log.info("[{}] was closed: {}", this.loginData.getIdentityData().getDisplayName(), reason);
+        log.info("[{}] with state {} was closed: {}", this.getDisplayName(), this.loginState, reason);
+        this.loginState = LoginState.CLOSED;
     }
 
     @Override
@@ -105,9 +110,11 @@ public class ChunkyPeer implements BedrockPacketHandler {
                 this.close(packet.getStatus().name());
                 break;
         }
-
-        log.info("changed state to {}", loginState); // TODO: remove
         return true;
+    }
+
+    public String getDisplayName() {
+        return this.loginData.getIdentityData().getDisplayName();
     }
 
     // Handlers
@@ -149,6 +156,7 @@ public class ChunkyPeer implements BedrockPacketHandler {
 
     @Override
     public boolean handle(ChunkRadiusUpdatedPacket packet) {
+        log.debug("[{}] Changed chunk radius: {}", this.getDisplayName(), packet.getRadius());
         this.clientData.setChunkRadius(packet.getRadius());
         return true;
     }
@@ -156,6 +164,7 @@ public class ChunkyPeer implements BedrockPacketHandler {
     @Override
     public final boolean handle(StartGamePacket packet) {
         this.clientData.setEntityId(packet.getRuntimeEntityId());
+        this.clientData.setBlockPalette(packet.getBlockPalette());
         if (packet.getPlayerMovementSettings() != null) {
             this.clientData.setMovementMode(packet.getPlayerMovementSettings().getMovementMode());
         }
@@ -178,7 +187,7 @@ public class ChunkyPeer implements BedrockPacketHandler {
             return true;
         }
 
-        log.info("update position: {}", packet.getPosition());
+        log.debug("[{}] Update position: {}", this.getDisplayName(), packet.getPosition());
         if (packet.getMode() == MovePlayerPacket.Mode.RESPAWN) {
             this.clientData.updateAndSendPosition(packet.getPosition(), this.session);
         } else {
@@ -190,7 +199,13 @@ public class ChunkyPeer implements BedrockPacketHandler {
     @Override
     public boolean handle(LevelChunkPacket packet) {
         // TODO: deserialize and pass to the handler
-        log.info("chunk: x={} z={}", packet.getChunkX(), packet.getChunkZ());
+        if (packet.getChunkX() == 13 && packet.getChunkZ() == -7) {
+            log.info("[{}] Chunk: x={} z={}", this.getDisplayName(), packet.getChunkX(), packet.getChunkZ());
+            ByteBuf buffer = Unpooled.wrappedBuffer(packet.getData());
+            ChunkHolder chunkHolder = new ChunkHolder(packet.getChunkX(), packet.getChunkZ(), packet.getSubChunksLength());
+
+            Serializers.deserializeChunk(buffer, chunkHolder, this.loginData.getCodec().getProtocolVersion());
+        }
         return true;
     }
 }

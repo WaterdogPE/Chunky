@@ -13,11 +13,12 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.data;
+package dev.waterdog.chunky.common.palette;
 
-public enum LoginState {
-    CONNECTING,
-    LOGIN,
-    SPAWNED,
-    CLOSED
+public interface BlockPaletteLegacy extends BlockPalette {
+
+    int runtimeId2LegacyId(int runtimeId);
+    int runtimeId2LegacyData(int runtimeId);
+    int state2LegacyId(int runtimeId);
+    int state2LegacyData(int runtimeId);
 }

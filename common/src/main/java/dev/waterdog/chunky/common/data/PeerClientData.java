@@ -18,6 +18,8 @@ package dev.waterdog.chunky.common.data;
 import com.nukkitx.math.vector.Vector2f;
 import com.nukkitx.math.vector.Vector3f;
 import com.nukkitx.math.vector.Vector3i;
+import com.nukkitx.nbt.NbtList;
+import com.nukkitx.nbt.NbtMap;
 import com.nukkitx.protocol.bedrock.BedrockClientSession;
 import com.nukkitx.protocol.bedrock.data.AuthoritativeMovementMode;
 import com.nukkitx.protocol.bedrock.data.ClientPlayMode;
@@ -35,6 +37,7 @@ public class PeerClientData {
     private long entityId;
     private Vector3f position;
     private boolean chunkCache = false;
+    private NbtList<NbtMap> blockPalette;
     private AuthoritativeMovementMode movementMode = AuthoritativeMovementMode.CLIENT;
 
     public RequestChunkRadiusPacket radiusPacket() {
