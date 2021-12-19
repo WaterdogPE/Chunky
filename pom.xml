@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>dev.waterdog.chunky</groupId>
+    <artifactId>chunky</artifactId>
+    <packaging>pom</packaging>
+    <version>1.0-SNAPSHOT</version>
+    <modules>
+        <module>common</module>
+    </modules>
+
+    <properties>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <raklib.version>1.6.28-SNAPSHOT</raklib.version>
+        <protocol.protocol>bedrock-v475</protocol.protocol>
+        <protocol.version>2.9.4-SNAPSHOT</protocol.version>
+        <log4j2.version>2.17.0</log4j2.version>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>nukkitx-repo-release</id>
+            <url>https://repo.opencollab.dev/maven-releases/</url>
+        </repository>
+        <repository>
+            <id>nukkitx-repo-snapshot</id>
+            <url>https://repo.opencollab.dev/maven-snapshots/</url>
+        </repository>
+        <repository>
+            <id>waterdog</id>
+            <url>https://repo.waterdog.dev/artifactory/main/</url>
+        </repository>
+    </repositories>
+
+    <distributionManagement>
+        <repository>
+            <id>central</id>
+            <name>waterdog-releases</name>
+            <url>https://repo.waterdog.dev/artifactory/releases</url>
+        </repository>
+        <snapshotRepository>
+            <id>snapshots</id>
+            <name>waterdog-snapshots</name>
+            <url>https://repo.waterdog.dev/artifactory/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+</project>
