@@ -15,10 +15,13 @@
 
 package dev.waterdog.chunky.common.palette;
 
+import com.nukkitx.nbt.NbtMap;
+
 public interface BlockPaletteLegacy extends BlockPalette {
 
     int runtimeId2LegacyId(int runtimeId);
     int runtimeId2LegacyData(int runtimeId);
-    int state2LegacyId(int runtimeId);
-    int state2LegacyData(int runtimeId);
+    int state2LegacyId(NbtMap state);
+    int state2LegacyData(NbtMap state);
+    NbtMap legacy2State(int legacyId, int legacyData);
 }

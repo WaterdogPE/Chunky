@@ -13,19 +13,19 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.serializer;
+package dev.waterdog.chunky.common.serializer.subchunk;
 
 import com.nukkitx.nbt.NBTInputStream;
 import com.nukkitx.nbt.NbtMap;
 import com.nukkitx.nbt.NbtUtils;
 import com.nukkitx.network.VarInts;
-import dev.waterdog.chunky.common.data.ChunkHolder;
-import dev.waterdog.chunky.common.data.PalettedStorage;
+import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
+import dev.waterdog.chunky.common.data.chunk.BlockStorage;
+import dev.waterdog.chunky.common.palette.BlockPalette;
+import dev.waterdog.chunky.common.serializer.SubChunkSerializer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.io.IOException;
 import java.util.List;
@@ -34,33 +34,30 @@ public class SubChunkSerializerV8 implements SubChunkSerializer {
     public static final SubChunkSerializerV8 INSTANCE = new SubChunkSerializerV8();
 
     @Override
-    public PalettedStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder) {
+    public BlockStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette) {
         int storagesCount = buffer.readUnsignedByte();
-        PalettedStorage[] storages = new PalettedStorage[storagesCount];
+        BlockStorage[] storages = new BlockStorage[storagesCount];
 
         for (int y = 0; y < storagesCount; y++) {
-            PalettedStorage storage = new PalettedStorage();
+            BlockStorage storage = new BlockStorage();
+            storage.setLegacy(false);
             storage.setPaletteHeader(buffer.readUnsignedByte());
             // storage is 16 * 16 * 16 large
             int blocksPerWord = Integer.SIZE / storage.getBitsPerBlock();
             int wordsCount = (4096 + blocksPerWord - 1) / blocksPerWord;
+            if (storage.isPersistent()) {
+                throw new IllegalStateException("SubChunk version 8 does not support persistent storages over network!");
+            }
 
-            // 1 byte per word
-            byte[] words = new byte[wordsCount];
+            // 4 bytes per word - reading VarInt here
+            byte[] words = new byte[wordsCount * Integer.BYTES];
             buffer.readBytes(words);
             storage.setWords(words);
 
             int paletteSize = VarInts.readInt(buffer);
-            if (storage.isPersistent()) {
-                List<NbtMap> persistentPalette = new ObjectArrayList<>();
-                readPersistentState(buffer, paletteSize, persistentPalette);
-                storage.setPersistentPalette(persistentPalette);
-            } else {
-                IntList runtimePalette = new IntArrayList();
-                for (int i = 0; i < paletteSize; i++) {
-                    runtimePalette.add(VarInts.readInt(buffer));
-                }
-                storage.setRuntimePalette(runtimePalette);
+            storage.setPalette(new IntArrayList());
+            for (int i = 0; i < paletteSize; i++) {
+                storage.getPalette().add(VarInts.readInt(buffer));
             }
             storages[y] = storage;
         }

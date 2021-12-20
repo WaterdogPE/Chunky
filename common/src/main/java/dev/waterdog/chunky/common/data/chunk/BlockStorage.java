@@ -13,7 +13,28 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common;
+package dev.waterdog.chunky.common.data.chunk;
 
-public class ChunkyClient {
+import it.unimi.dsi.fastutil.ints.IntList;
+import lombok.Data;
+
+
+@Data
+public class BlockStorage {
+    private boolean legacy;
+    // Legacy data
+    private byte[] blockIds;
+    private byte[] blockData;
+    // New paletted format
+    private int paletteHeader;
+    private byte[] words;
+    private IntList palette;
+
+    public int getBitsPerBlock() {
+        return this.paletteHeader >> 1;
+    }
+
+    public boolean isPersistent() {
+        return (this.paletteHeader & 0x01) == 0;
+    }
 }

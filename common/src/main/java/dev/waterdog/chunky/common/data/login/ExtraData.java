@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.data;
+package dev.waterdog.chunky.common.data.login;
 
 import com.google.gson.JsonArray;
 import com.google.gson.annotations.JsonAdapter;

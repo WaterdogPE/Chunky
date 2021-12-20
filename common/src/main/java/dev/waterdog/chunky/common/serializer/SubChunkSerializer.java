@@ -15,11 +15,12 @@
 
 package dev.waterdog.chunky.common.serializer;
 
-import dev.waterdog.chunky.common.data.ChunkHolder;
-import dev.waterdog.chunky.common.data.PalettedStorage;
+import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
+import dev.waterdog.chunky.common.data.chunk.BlockStorage;
+import dev.waterdog.chunky.common.palette.BlockPalette;
 import io.netty.buffer.ByteBuf;
 
 public interface SubChunkSerializer {
 
-    PalettedStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder);
+    BlockStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette);
 }

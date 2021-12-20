@@ -13,39 +13,41 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.serializer;
+package dev.waterdog.chunky.common.serializer.chunk;
 
-import com.nukkitx.network.VarInts;
-import dev.waterdog.chunky.common.data.ChunkHolder;
-import dev.waterdog.chunky.common.data.PalettedStorage;
-import dev.waterdog.chunky.common.data.SubChunkHolder;
+import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
+import dev.waterdog.chunky.common.data.chunk.BlockStorage;
+import dev.waterdog.chunky.common.data.chunk.SubChunkHolder;
+import dev.waterdog.chunky.common.palette.BlockPalette;
+import dev.waterdog.chunky.common.serializer.ChunkSerializer;
+import dev.waterdog.chunky.common.serializer.Serializers;
 import io.netty.buffer.ByteBuf;
 
 import static dev.waterdog.chunky.common.serializer.Serializers.*;
 
-public class ChunkSerializer_338 implements ChunkSerializer {
-    public static final ChunkSerializer_338 INSTANCE = new ChunkSerializer_338();
+public class ChunkSerializer338 implements ChunkSerializer {
+    public static final ChunkSerializer338 INSTANCE = new ChunkSerializer338();
 
     @Override
-    public void deserialize(ByteBuf buffer, ChunkHolder chunkHolder) {
+    public void deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette) {
         SubChunkHolder[] subChunks = new SubChunkHolder[chunkHolder.getSubChunksLength()];
-        for (int y = MIN_SUBCHUNK_INDEX; y < chunkHolder.getSubChunksLength(); y++) {
+        for (int y = MIN_SUBCHUNK_INDEX, i = 0; y < MAX_SUBCHUNK_INDEX && i < chunkHolder.getSubChunksLength() ;y++, i++) {
             int subChunkVersion = buffer.readUnsignedByte();
-            PalettedStorage[] storages = Serializers.deserializeSubChunk(buffer, chunkHolder, subChunkVersion);
+            BlockStorage[] storages = Serializers.deserializeSubChunk(buffer, chunkHolder, blockPalette, subChunkVersion);
             subChunks[y] = new SubChunkHolder(y, storages);
         }
+        chunkHolder.setSubChunks(subChunks);
 
         // TODO: we don't support 3D biomes so far
         byte[] biomeData = new byte[256];
         buffer.readBytes(biomeData);
+        chunkHolder.setBiomeData(biomeData);
 
         short borderBlocksSize = buffer.readUnsignedByte();
         buffer.skipBytes(borderBlocksSize); // 1 byte per borderBlock
 
-        int extraDataSize = VarInts.readInt(buffer); // extraData count
-        // TODO: we are probably going to read this
-
         byte[] blockEntities = new byte[buffer.readableBytes()];
         buffer.readBytes(blockEntities);
+        chunkHolder.setBlockEntities(blockEntities);
     }
 }

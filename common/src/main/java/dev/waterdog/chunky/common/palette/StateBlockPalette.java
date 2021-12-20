@@ -27,12 +27,9 @@ public class StateBlockPalette implements BlockPalette {
 
     private final Int2ObjectMap<NbtMap> runtime2StateMap = new Int2ObjectOpenHashMap<>();
     private final Object2IntMap<NbtMap> state2RuntimeMap = new Object2IntOpenHashMap<>();
-    private final long hash;
 
     public StateBlockPalette(NbtList<NbtMap> mapping) {
         this.state2RuntimeMap.defaultReturnValue(-1);
-
-        this.hash = mapping.hashCode();
         for (int i = 0; i < mapping.size(); i++) {
             this.registerState(mapping.get(i), i);
         }
@@ -55,10 +52,5 @@ public class StateBlockPalette implements BlockPalette {
     @Override
     public NbtMap runtimeId2State(int runtimeId) {
         return this.runtime2StateMap.get(runtimeId);
-    }
-
-    @Override
-    public long getHash() {
-        return this.hash;
     }
 }

@@ -13,11 +13,24 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.data;
+package dev.waterdog.chunky.common.data.login;
 
-public enum LoginState {
-    CONNECTING,
-    LOGIN,
-    SPAWNED,
-    CLOSED
+import com.google.gson.annotations.SerializedName;
+import lombok.Builder;
+import lombok.Data;
+
+import java.util.UUID;
+
+@Data
+@Builder(builderClassName = "Builder")
+public class IdentityData {
+
+    @SerializedName("XUID")
+    private final String xuid;
+    @SerializedName("identity")
+    private final UUID identity;
+    @SerializedName("displayName")
+    private final String displayName;
+    @SerializedName("titleId")
+    private String titleId;
 }

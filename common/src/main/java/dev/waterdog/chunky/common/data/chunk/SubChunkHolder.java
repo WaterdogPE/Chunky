@@ -13,15 +13,12 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.data;
+package dev.waterdog.chunky.common.data.chunk;
 
 import lombok.Data;
 
 @Data
-public class ChunkHolder {
-
-    private final int chunkX;
-    private final int chunkZ;
-    private final int subChunksLength;
-
+public class SubChunkHolder {
+    private final int y;
+    private final BlockStorage[] storages;
 }

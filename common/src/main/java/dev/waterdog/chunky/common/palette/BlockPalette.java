@@ -21,6 +21,4 @@ public interface BlockPalette {
 
     int state2RuntimeId(NbtMap state);
     NbtMap runtimeId2State(int runtimeId);
-
-    long getHash();
 }

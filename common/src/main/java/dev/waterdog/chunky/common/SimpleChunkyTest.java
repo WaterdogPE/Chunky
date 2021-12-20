@@ -17,22 +17,24 @@ package dev.waterdog.chunky.common;
 
 import com.nukkitx.protocol.bedrock.BedrockPacketCodec;
 import com.nukkitx.protocol.bedrock.v388.Bedrock_v388;
-import com.nukkitx.protocol.bedrock.v475.Bedrock_v475;
-import dev.waterdog.chunky.common.network.ChunkyPeer;
-import io.netty.channel.DefaultEventLoop;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import dev.waterdog.chunky.common.network.ChunkyClient;
+import dev.waterdog.chunky.common.palette.DefaultBlockPaletteFactory;
 
 import java.net.InetSocketAddress;
 
-public class SimpleChunkyPeerTest {
+public class SimpleChunkyTest {
 
     private static final BedrockPacketCodec CODEC = Bedrock_v388.V388_CODEC;
     public static final InetSocketAddress ADDRESS = new InetSocketAddress("192.168.0.50", 19132);
 
     public static void main(String[] args) {
-        EventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
-        ChunkyPeer peer = new ChunkyPeer(CODEC, ADDRESS, eventLoopGroup.next());
-        peer.start().join();
+        ChunkyClient chunkyClient = ChunkyClient.builder()
+                .peerCount(1)
+                .codec(CODEC)
+                .raknetVersion(9)
+                .targetAddress(ADDRESS)
+                .paletteFactory(DefaultBlockPaletteFactory.INSTANCE)
+                .build();
+        chunkyClient.connect().join();
     }
 }

@@ -13,13 +13,14 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.data;
+package dev.waterdog.chunky.common.palette;
 
-import lombok.Data;
+import com.nukkitx.nbt.NbtList;
+import com.nukkitx.nbt.NbtMap;
 
-@Data
-public class SubChunkHolder {
+public interface BlockPaletteFactory {
 
-    private final int y;
-    private final PalettedStorage[] storages;
+    BlockPalette createBlockPalette(NbtList<NbtMap> blockStates, int version);
+
+    BlockPaletteLegacy createLegacyBlockPalette(NbtList<NbtMap> blockStates, int version);
 }

@@ -13,24 +13,21 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.data;
+package dev.waterdog.chunky.common.palette;
 
-import com.google.gson.annotations.SerializedName;
-import lombok.Builder;
-import lombok.Data;
+import com.nukkitx.nbt.NbtList;
+import com.nukkitx.nbt.NbtMap;
 
-import java.util.UUID;
+public class DefaultBlockPaletteFactory implements BlockPaletteFactory {
+    public static final DefaultBlockPaletteFactory INSTANCE = new DefaultBlockPaletteFactory();
 
-@Data
-@Builder(builderClassName = "Builder")
-public class IdentityData {
+    @Override
+    public BlockPalette createBlockPalette(NbtList<NbtMap> blockStates, int version) {
+        return new StateBlockPalette(blockStates);
+    }
 
-    @SerializedName("XUID")
-    private final String xuid;
-    @SerializedName("identity")
-    private final UUID identity;
-    @SerializedName("displayName")
-    private final String displayName;
-    @SerializedName("titleId")
-    private String titleId;
+    @Override
+    public BlockPaletteLegacy createLegacyBlockPalette(NbtList<NbtMap> blockStates, int version) {
+        return new LegacyStateBlockPalette(blockStates);
+    }
 }
