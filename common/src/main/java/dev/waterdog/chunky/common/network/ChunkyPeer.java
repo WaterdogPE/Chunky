@@ -33,6 +33,8 @@ import dev.waterdog.chunky.common.serializer.Serializers;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.EventLoop;
+import io.netty.util.concurrent.ScheduledFuture;
+import it.unimi.dsi.fastutil.longs.*;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
@@ -40,9 +42,12 @@ import javax.crypto.SecretKey;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.interfaces.ECPublicKey;
-import java.util.Base64;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+
+import static dev.waterdog.chunky.common.util.ChunkUtils.*;
 
 @Log4j2
 public class ChunkyPeer implements BedrockPacketHandler {
@@ -60,6 +65,11 @@ public class ChunkyPeer implements BedrockPacketHandler {
     private BedrockClientSession session;
     @Getter
     private LoginState loginState = LoginState.CONNECTING;
+
+    private ScheduledFuture<?> tickFuture;
+
+    private final List<Long> chunkRequests = new CopyOnWriteArrayList<>(); // LongLists.synchronize(new LongArrayList());
+    private final LongSet pendingChunks = new LongArraySet();
 
     public ChunkyPeer(ChunkyClient parent, BedrockPacketCodec codec, InetSocketAddress targetAddress, EventLoop eventLoop) {
         this.parent = parent;
@@ -93,29 +103,78 @@ public class ChunkyPeer implements BedrockPacketHandler {
         this.session.sendPacket(this.clientData.cacheStatusPacket());
     }
 
+    private void doSpawn() {
+        log.info("[{}] has spawned and is ready for incoming chunks!", this.getDisplayName());
+        this.tickFuture = this.eventLoop.scheduleAtFixedRate(this::onTick, 0, 200, TimeUnit.MILLISECONDS);
+    }
+
     public void close(String reason) {
         if (this.session != null && !this.session.isClosed()) {
             this.bedrockClient.close(false);
+        }
+        if (this.tickFuture != null) {
+            this.tickFuture.cancel(true);
         }
         log.info("[{}] with state {} was closed: {}", this.getDisplayName(), this.loginState, reason);
         this.loginState = LoginState.CLOSED;
     }
 
-    @Override
-    public boolean handle(PlayStatusPacket packet) {
-        switch (packet.getStatus()) {
-            case LOGIN_SUCCESS:
-                this.loginState = LoginState.LOGIN;
-                this.onLogin();
-                break;
-            case PLAYER_SPAWN:
-                this.loginState = LoginState.SPAWNED;
-                break;
-            default:
-                this.close(packet.getStatus().name());
-                break;
+    public boolean requestChunk(long chunkIndex) {
+        if (this.loginState == LoginState.CLOSED) {
+            return false;
         }
+
+        if (this.parent.getMaxPendingRequests() != 0 && this.chunkRequests.size() >= this.parent.getMaxPendingRequests()) {
+            return false;
+        }
+        this.chunkRequests.add(chunkIndex);
         return true;
+    }
+
+    private void onTick() {
+        if (this.loginState == LoginState.CLOSED || this.session == null || this.session.isClosed()) {
+            return;
+        }
+
+        try {
+            // Remove duplicates
+            this.chunkRequests.removeIf((index) -> this.pendingChunks.contains((long) index));
+            // Request new chunks
+            if (!this.chunkRequests.isEmpty() && this.pendingChunks.isEmpty()) {
+                this.requestChunkInternal(this.chunkRequests.remove(0));
+            }
+        } catch (Exception e) {
+            log.error("[{}] Unable to tick", this.getDisplayName(), e);
+        }
+    }
+
+    private void requestChunkInternal(long index) {
+        int chunkX = chunkX(index);
+        int chunkZ = chunkZ(index);
+        this.pendingChunks.add(index);
+        if (log.isDebugEnabled()) {
+            log.debug("[{}] Requesting chunk x={} z={}", this.getDisplayName(), chunkX, chunkZ);
+        }
+        // Calculate all chunks that server will send us
+        // Firstly we need all chunks from new position
+        int radius = Math.max(1, this.getChunkRadius() - 1);
+        LongSet newChunks = new LongArraySet();
+        checkChunksInRadius(chunkX, chunkZ, radius, newChunks::add);
+        // Remove chunks that we already got
+        checkChunksInRadius(this.getChunkX(), this.getChunkZ(), radius, newChunks::remove);
+        this.pendingChunks.addAll(newChunks);
+        this.chunkRequests.removeAll(newChunks);
+        // Change position
+        this.clientData.updateAndSendPosition(Vector3f.from((chunkX << 4) + 10, 255, (chunkZ << 4) + 10), this.session);
+    }
+
+    protected void offerChunkRequestUnsafe(long index) {
+        this.chunkRequests.add(index);
+    }
+
+    protected void offerChunkUnsafe(long index) {
+        // this.eventLoop.execute(() -> this.pendingChunks.add(index));
+        this.pendingChunks.add(index);
     }
 
     public String getDisplayName() {
@@ -123,8 +182,27 @@ public class ChunkyPeer implements BedrockPacketHandler {
     }
 
     public Vector2i getChunkPosition() {
-        Vector3f position = this.clientData.getPosition();
-        return Vector2i.from((int) position.getX() >> 4, (int) position.getZ() >> 4);
+        return Vector2i.from(this.getChunkX(), this.getChunkZ());
+    }
+
+    public int getChunkX() {
+        return (int) this.clientData.getPosition().getX() >> 4;
+    }
+
+    public int getChunkZ() {
+        return (int) this.clientData.getPosition().getZ() >> 4;
+    }
+
+    public int getChunkRadius() {
+        return this.clientData.getChunkRadius();
+    }
+
+    public Collection<Long> getChunkRequests() {
+        return Collections.unmodifiableCollection(this.chunkRequests);
+    }
+
+    public Collection<Long> getPendingChunks() {
+        return Collections.unmodifiableCollection(this.pendingChunks);
     }
 
     // Handlers
@@ -149,6 +227,24 @@ public class ChunkyPeer implements BedrockPacketHandler {
     }
 
     @Override
+    public boolean handle(PlayStatusPacket packet) {
+        switch (packet.getStatus()) {
+            case LOGIN_SUCCESS:
+                this.loginState = LoginState.LOGIN;
+                this.onLogin();
+                break;
+            case PLAYER_SPAWN:
+                this.loginState = LoginState.SPAWNED;
+                this.doSpawn();
+                break;
+            default:
+                this.close(packet.getStatus().name());
+                break;
+        }
+        return true;
+    }
+
+    @Override
     public final boolean handle(ResourcePacksInfoPacket packet) {
         ResourcePackClientResponsePacket response = new ResourcePackClientResponsePacket();
         response.setStatus(ResourcePackClientResponsePacket.Status.HAVE_ALL_PACKS);
@@ -166,7 +262,9 @@ public class ChunkyPeer implements BedrockPacketHandler {
 
     @Override
     public boolean handle(ChunkRadiusUpdatedPacket packet) {
-        log.debug("[{}] Changed chunk radius: {}", this.getDisplayName(), packet.getRadius());
+        if (log.isDebugEnabled()) {
+            log.debug("[{}] Changed chunk radius: {}", this.getDisplayName(), packet.getRadius());
+        }
         this.clientData.setChunkRadius(packet.getRadius());
         return true;
     }
@@ -197,7 +295,10 @@ public class ChunkyPeer implements BedrockPacketHandler {
             return true;
         }
 
-        log.debug("[{}] Update position: {}", this.getDisplayName(), packet.getPosition());
+        if (log.isDebugEnabled()) {
+            log.debug("[{}] Update position: {}", this.getDisplayName(), packet.getPosition());
+        }
+
         if (packet.getMode() == MovePlayerPacket.Mode.RESPAWN) {
             this.clientData.updateAndSendPosition(packet.getPosition(), this.session);
         } else {
@@ -208,11 +309,22 @@ public class ChunkyPeer implements BedrockPacketHandler {
 
     @Override
     public boolean handle(LevelChunkPacket packet) {
-        log.info("[{}] Chunk: x={} z={}", this.getDisplayName(), packet.getChunkX(), packet.getChunkZ());
+        if (log.isDebugEnabled()) {
+            log.debug("[{}] Chunk: x={} z={}", this.getDisplayName(), packet.getChunkX(), packet.getChunkZ());
+        }
+
+        if (this.loginState != LoginState.SPAWNED) {
+            return true;
+        }
 
         ByteBuf buffer = Unpooled.wrappedBuffer(packet.getData());
         ChunkHolder chunkHolder = new ChunkHolder(packet.getChunkX(), packet.getChunkZ(), packet.getSubChunksLength());
         Serializers.deserializeChunk(buffer, chunkHolder, this.blockPalette, this.loginData.getCodec().getProtocolVersion());
+
+        long chunkIndex = chunkIndex(packet.getChunkX(), packet.getChunkZ());
+        if (!this.pendingChunks.remove(chunkIndex) && log.isDebugEnabled()) {
+            log.debug("[{}] Not requested chunk: x={} z={}", this.getDisplayName(), packet.getChunkX(), packet.getChunkZ());
+        }
         this.parent.onChunkDeserializedCallback(chunkHolder, this);
         return true;
     }
