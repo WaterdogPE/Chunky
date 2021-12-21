@@ -20,7 +20,7 @@ import com.nukkitx.nbt.NbtMap;
 import com.nukkitx.nbt.NbtUtils;
 import com.nukkitx.network.VarInts;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
-import dev.waterdog.chunky.common.data.chunk.BlockStorage;
+import dev.waterdog.chunky.common.data.chunk.ChunkyBlockStorage;
 import dev.waterdog.chunky.common.palette.BlockPalette;
 import dev.waterdog.chunky.common.serializer.SubChunkSerializer;
 import io.netty.buffer.ByteBuf;
@@ -34,12 +34,12 @@ public class SubChunkSerializerV8 implements SubChunkSerializer {
     public static final SubChunkSerializerV8 INSTANCE = new SubChunkSerializerV8();
 
     @Override
-    public BlockStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette) {
+    public ChunkyBlockStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette) {
         int storagesCount = buffer.readUnsignedByte();
-        BlockStorage[] storages = new BlockStorage[storagesCount];
+        ChunkyBlockStorage[] storages = new ChunkyBlockStorage[storagesCount];
 
         for (int y = 0; y < storagesCount; y++) {
-            BlockStorage storage = new BlockStorage();
+            ChunkyBlockStorage storage = new ChunkyBlockStorage();
             storage.setLegacy(false);
             storage.setPaletteHeader(buffer.readUnsignedByte());
             // storage is 16 * 16 * 16 large
@@ -49,9 +49,10 @@ public class SubChunkSerializerV8 implements SubChunkSerializer {
                 throw new IllegalStateException("SubChunk version 8 does not support persistent storages over network!");
             }
 
-            // 4 bytes per word - reading VarInt here
-            byte[] words = new byte[wordsCount * Integer.BYTES];
-            buffer.readBytes(words);
+            int[] words = new int[wordsCount];
+            for (int i = 0; i < wordsCount; i++) {
+               words[i] = buffer.readIntLE();
+            }
             storage.setWords(words);
 
             int paletteSize = VarInts.readInt(buffer);

@@ -16,7 +16,7 @@
 package dev.waterdog.chunky.common.serializer.subchunk;
 
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
-import dev.waterdog.chunky.common.data.chunk.BlockStorage;
+import dev.waterdog.chunky.common.data.chunk.ChunkyBlockStorage;
 import dev.waterdog.chunky.common.palette.BlockPalette;
 import dev.waterdog.chunky.common.palette.BlockPaletteLegacy;
 import dev.waterdog.chunky.common.serializer.SubChunkSerializer;
@@ -26,7 +26,7 @@ public class SubChunkSerializerV7 implements SubChunkSerializer {
     public static final SubChunkSerializerV7 INSTANCE = new SubChunkSerializerV7();
 
     @Override
-    public BlockStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette) {
+    public ChunkyBlockStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette) {
         if (!(blockPalette instanceof BlockPaletteLegacy)) {
             throw new IllegalArgumentException("Cannot deserialize legacy chunk storage with runtime palette: " + blockPalette.getClass().getSimpleName());
         }
@@ -37,8 +37,8 @@ public class SubChunkSerializerV7 implements SubChunkSerializer {
         byte[] blockData = new byte[2048];
         buffer.readBytes(blockData);
 
-        BlockStorage[] storages = new BlockStorage[2];
-        BlockStorage storage = new BlockStorage();
+        ChunkyBlockStorage[] storages = new ChunkyBlockStorage[2];
+        ChunkyBlockStorage storage = new ChunkyBlockStorage();
         storage.setLegacy(true);
         storage.setBlockIds(blockIds);
         storage.setBlockData(blockData);

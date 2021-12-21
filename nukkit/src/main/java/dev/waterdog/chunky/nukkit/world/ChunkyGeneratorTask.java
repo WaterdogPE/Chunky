@@ -13,12 +13,24 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.data.chunk;
+package dev.waterdog.chunky.nukkit.world;
 
-import lombok.Data;
+import cn.nukkit.level.format.generic.BaseFullChunk;
+import cn.nukkit.scheduler.AsyncTask;
+import lombok.extern.log4j.Log4j2;
 
-@Data
-public class SubChunkHolder {
-    private final int y;
-    private final ChunkyBlockStorage[] storages;
+public class ChunkyGeneratorTask extends AsyncTask {
+
+    private final ChunkyManager manager;
+    private BaseFullChunk chunk;
+
+    public ChunkyGeneratorTask(ChunkyManager manager, BaseFullChunk chunk) {
+        this.manager = manager;
+        this.chunk = chunk;
+    }
+
+    @Override
+    public void onRun() {
+        this.manager.requestChunk(this.chunk);
+    }
 }

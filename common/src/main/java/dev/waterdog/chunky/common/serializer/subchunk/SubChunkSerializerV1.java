@@ -18,7 +18,7 @@ package dev.waterdog.chunky.common.serializer.subchunk;
 import com.nukkitx.nbt.NBTInputStream;
 import com.nukkitx.nbt.NbtMap;
 import com.nukkitx.nbt.NbtUtils;
-import dev.waterdog.chunky.common.data.chunk.BlockStorage;
+import dev.waterdog.chunky.common.data.chunk.ChunkyBlockStorage;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.palette.BlockPalette;
 import dev.waterdog.chunky.common.serializer.SubChunkSerializer;
@@ -32,8 +32,8 @@ public class SubChunkSerializerV1 implements SubChunkSerializer {
     public static final SubChunkSerializerV1 INSTANCE = new SubChunkSerializerV1();
 
     @Override
-    public BlockStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette) {
-        BlockStorage storage = new BlockStorage();
+    public ChunkyBlockStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette) {
+        ChunkyBlockStorage storage = new ChunkyBlockStorage();
         storage.setLegacy(false);
         storage.setPaletteHeader(buffer.readUnsignedByte());
         // storage is 16 * 16 * 16 large
@@ -43,9 +43,10 @@ public class SubChunkSerializerV1 implements SubChunkSerializer {
             throw new IllegalStateException("SubChunk version 1 does not support runtime storages over network!");
         }
 
-        // 4 bytes per word - readIntLE()
-        byte[] words = new byte[wordsCount * Integer.BYTES];
-        buffer.readBytes(words);
+        int[] words = new int[wordsCount];
+        for (int i = 0; i < wordsCount; i++) {
+            words[i] = buffer.readIntLE();
+        }
         storage.setWords(words);
 
         int paletteSize = buffer.readIntLE();
@@ -60,7 +61,7 @@ public class SubChunkSerializerV1 implements SubChunkSerializer {
             throw new RuntimeException("Cannot read persistent block palette", e);
         }
 
-        BlockStorage[] storages = new BlockStorage[2];
+        ChunkyBlockStorage[] storages = new ChunkyBlockStorage[2];
         storages[0] = storage;
         return storages;
     }

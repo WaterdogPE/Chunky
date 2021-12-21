@@ -13,12 +13,13 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.data.chunk;
+package dev.waterdog.chunky.nukkit.world;
 
-import lombok.Data;
+import cn.nukkit.level.format.generic.BaseFullChunk;
+import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
+import dev.waterdog.chunky.common.palette.BlockPaletteLegacy;
 
-@Data
-public class SubChunkHolder {
-    private final int y;
-    private final ChunkyBlockStorage[] storages;
+public interface ChunkBuilder {
+
+    BaseFullChunk buildChunk(BaseFullChunk chunk, ChunkHolder chunkHolder, BlockPaletteLegacy blockPalette);
 }

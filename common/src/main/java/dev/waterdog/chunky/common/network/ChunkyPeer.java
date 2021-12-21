@@ -80,7 +80,9 @@ public class ChunkyPeer implements BedrockPacketHandler {
 
     public CompletableFuture<Void> start() {
         if (this.session != null) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException("Peer is already running!"));
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            future.completeExceptionally(new IllegalArgumentException("Peer is already running!"));
+            return future;
         }
 
         this.bedrockClient = new BedrockClient(new InetSocketAddress("0.0.0.0", 0), this.eventLoop);
@@ -162,7 +164,7 @@ public class ChunkyPeer implements BedrockPacketHandler {
         checkChunksInRadius(chunkX, chunkZ, radius, newChunks::add);
         // Remove chunks that we already got
         checkChunksInRadius(this.getChunkX(), this.getChunkZ(), radius, newChunks::remove);
-        this.pendingChunks.addAll(newChunks);
+        // TODO: this.pendingChunks.addAll(newChunks);
         this.chunkRequests.removeAll(newChunks);
         // Change position
         this.clientData.updateAndSendPosition(Vector3f.from((chunkX << 4) + 10, 255, (chunkZ << 4) + 10), this.session);
@@ -318,7 +320,7 @@ public class ChunkyPeer implements BedrockPacketHandler {
         }
 
         ByteBuf buffer = Unpooled.wrappedBuffer(packet.getData());
-        ChunkHolder chunkHolder = new ChunkHolder(packet.getChunkX(), packet.getChunkZ(), packet.getSubChunksLength());
+        ChunkHolder chunkHolder = new ChunkHolder(packet.getChunkX(), packet.getChunkZ(), packet.getSubChunksLength(), this.blockPalette);
         Serializers.deserializeChunk(buffer, chunkHolder, this.blockPalette, this.loginData.getCodec().getProtocolVersion());
 
         long chunkIndex = chunkIndex(packet.getChunkX(), packet.getChunkZ());

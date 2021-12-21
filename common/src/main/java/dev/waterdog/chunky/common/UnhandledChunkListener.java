@@ -13,12 +13,12 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.data.chunk;
+package dev.waterdog.chunky.common;
 
-import lombok.Data;
+import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
+import dev.waterdog.chunky.common.network.ChunkyPeer;
 
-@Data
-public class SubChunkHolder {
-    private final int y;
-    private final ChunkyBlockStorage[] storages;
+public interface UnhandledChunkListener {
+
+    void onChunkReceived(ChunkHolder chunkHolder, ChunkyPeer peer);
 }

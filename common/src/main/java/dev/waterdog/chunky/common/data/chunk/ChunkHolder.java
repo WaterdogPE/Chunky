@@ -15,6 +15,7 @@
 
 package dev.waterdog.chunky.common.data.chunk;
 
+import dev.waterdog.chunky.common.palette.BlockPaletteLegacy;
 import lombok.Data;
 
 @Data
@@ -22,6 +23,7 @@ public class ChunkHolder {
     private final int chunkX;
     private final int chunkZ;
     private final int subChunksLength;
+    private final BlockPaletteLegacy blockPalette;
 
     private SubChunkHolder[] subChunks;
     private byte[] biomeData;

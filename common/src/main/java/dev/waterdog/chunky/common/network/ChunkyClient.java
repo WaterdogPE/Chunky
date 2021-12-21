@@ -18,6 +18,7 @@ package dev.waterdog.chunky.common.network;
 import com.google.common.base.Preconditions;
 import com.nukkitx.network.raknet.util.RoundRobinIterator;
 import com.nukkitx.protocol.bedrock.BedrockPacketCodec;
+import dev.waterdog.chunky.common.UnhandledChunkListener;
 import dev.waterdog.chunky.common.data.ChunkRequest;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.palette.BlockPaletteFactory;
@@ -51,6 +52,8 @@ public class ChunkyClient {
     private final int maxPendingRequests;
 
     private final BlockPaletteFactory paletteFactory;
+    @Setter
+    private UnhandledChunkListener chunkListener;
 
     private final EventLoopGroup eventLoopGroup;
     private final Set<ChunkyPeer> peers = ObjectSets.synchronize(new ObjectArraySet<>());
@@ -63,13 +66,14 @@ public class ChunkyClient {
         return new Builder();
     }
 
-    public ChunkyClient(int peerCount, BedrockPacketCodec codec, int raknetVersion, InetSocketAddress targetAddress, int maxPendingRequests, BlockPaletteFactory paletteFactory) {
+    public ChunkyClient(int peerCount, BedrockPacketCodec codec, int raknetVersion, InetSocketAddress targetAddress, int maxPendingRequests, BlockPaletteFactory paletteFactory, UnhandledChunkListener chunkListener) {
         this.peerCount = peerCount;
         this.codec = codec;
         this.raknetVersion = raknetVersion;
         this.targetAddress = targetAddress;
         this.maxPendingRequests = maxPendingRequests;
         this.paletteFactory = paletteFactory;
+        this.chunkListener = chunkListener;
         this.eventLoopGroup = new NioEventLoopGroup(peerCount);
     }
 
@@ -95,6 +99,7 @@ public class ChunkyClient {
         for (ChunkyPeer peer : this.peers) {
             peer.close("Disconnected");
         }
+        this.peers.clear();
     }
 
     public CompletableFuture<ChunkHolder> requestChunk(long index) {
@@ -110,7 +115,9 @@ public class ChunkyClient {
 
         ChunkyPeer peer = this.assignRequest(index, request = new ChunkRequest(chunkX, chunkZ));
         if (peer == null) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Can not request chunk x=" + chunkX + " z=" + chunkZ));
+            CompletableFuture<ChunkHolder> future = new CompletableFuture<>();
+            future.completeExceptionally(new IllegalStateException("Can not request chunk x=" + chunkX + " z=" + chunkZ));
+            return future;
         }
         this.pendingChunkRequests.put(index, request);
         return request.getFuture();
@@ -123,8 +130,10 @@ public class ChunkyClient {
             request.getFuture().complete(chunkHolder);
             return;
         }
-        // TODO:
-        log.info("Received unexpected chunk: index={} x={} z={}", index, chunkHolder.getChunkX(), chunkHolder.getChunkZ());
+
+        if (this.chunkListener != null) {
+            this.chunkListener.onChunkReceived(chunkHolder, peer);
+        }
     }
 
     private ChunkyPeer assignRequest(long index, ChunkRequest request) {
@@ -150,12 +159,12 @@ public class ChunkyClient {
                 }
             }
 
-            for (long chunkIndex : pendingChunks) {
+            /*for (long chunkIndex : pendingChunks) {
                 if (isIndexInRadius(chunkX(chunkIndex), chunkZ(chunkIndex), radius, index)) {
                     peer.offerChunkUnsafe(index);
                     return peer;
                 }
-            }
+            }*/
 
             if (peer.requestChunk(index)) {
                 return peer;
@@ -173,9 +182,10 @@ public class ChunkyClient {
         private InetSocketAddress targetAddress;
         private int maxPendingRequests;
         private BlockPaletteFactory paletteFactory;
+        private UnhandledChunkListener chunkListener;
 
         public ChunkyClient build() {
-            return new ChunkyClient(this.peerCount, this.codec, this.raknetVersion, this.targetAddress, this.maxPendingRequests, this.paletteFactory);
+            return new ChunkyClient(this.peerCount, this.codec, this.raknetVersion, this.targetAddress, this.maxPendingRequests, this.paletteFactory, this.chunkListener);
         }
     }
 }

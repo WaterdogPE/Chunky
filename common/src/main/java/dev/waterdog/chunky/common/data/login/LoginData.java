@@ -26,6 +26,7 @@ import dev.waterdog.chunky.common.network.HandshakeUtils;
 import io.netty.util.AsciiString;
 import lombok.Data;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -55,9 +56,10 @@ public class LoginData {
     }
 
     private static byte[] loadGeometryData() {
-        // try (InputStream stream = LoginData.class.getResourceAsStream("steve_geometry.json")) {
-        try (InputStream stream = Files.newInputStream(Paths.get("steve_geometry.json"))) {
-            return stream.readAllBytes();
+        try (InputStream stream = LoginData.class.getClassLoader().getResourceAsStream("steve_geometry.json")) {
+            byte[] bytes = new byte[stream.available()];
+            stream.read(bytes);
+            return bytes;
         } catch (IOException e) {
             throw new RuntimeException("Cannot load geometry data", e);
         }

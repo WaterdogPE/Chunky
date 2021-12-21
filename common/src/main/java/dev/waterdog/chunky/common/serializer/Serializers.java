@@ -17,7 +17,7 @@ package dev.waterdog.chunky.common.serializer;
 
 import com.nukkitx.protocol.bedrock.v388.Bedrock_v388;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
-import dev.waterdog.chunky.common.data.chunk.BlockStorage;
+import dev.waterdog.chunky.common.data.chunk.ChunkyBlockStorage;
 import dev.waterdog.chunky.common.palette.BlockPalette;
 import dev.waterdog.chunky.common.serializer.chunk.ChunkSerializer338;
 import dev.waterdog.chunky.common.serializer.subchunk.SubChunkSerializerV1;
@@ -76,7 +76,7 @@ public class Serializers {
         return chunkSerializer;
     }
 
-    public static BlockStorage[] deserializeSubChunk(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette, int version) {
+    public static ChunkyBlockStorage[] deserializeSubChunk(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette, int version) {
         return getSubChunkSerializer(version).deserialize(buffer, chunkHolder, blockPalette);
     }
 }

@@ -1,0 +1,7 @@
+name: "ChunkyNukkit"
+main: dev.waterdog.chunky.nukkit.ChunkyPlugin
+version: 1.0.0
+author: "Alemiz"
+description: "World generator that grabs chunks from other server"
+api: ["1.0.0"]
+load: STARTUP

@@ -20,14 +20,14 @@ import lombok.Data;
 
 
 @Data
-public class BlockStorage {
+public class ChunkyBlockStorage {
     private boolean legacy;
     // Legacy data
     private byte[] blockIds;
     private byte[] blockData;
     // New paletted format
     private int paletteHeader;
-    private byte[] words;
+    private int[] words;
     private IntList palette;
 
     public int getBitsPerBlock() {

@@ -16,7 +16,7 @@
 package dev.waterdog.chunky.common.serializer.chunk;
 
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
-import dev.waterdog.chunky.common.data.chunk.BlockStorage;
+import dev.waterdog.chunky.common.data.chunk.ChunkyBlockStorage;
 import dev.waterdog.chunky.common.data.chunk.SubChunkHolder;
 import dev.waterdog.chunky.common.palette.BlockPalette;
 import dev.waterdog.chunky.common.serializer.ChunkSerializer;
@@ -33,7 +33,7 @@ public class ChunkSerializer338 implements ChunkSerializer {
         SubChunkHolder[] subChunks = new SubChunkHolder[chunkHolder.getSubChunksLength()];
         for (int y = MIN_SUBCHUNK_INDEX, i = 0; y < MAX_SUBCHUNK_INDEX && i < chunkHolder.getSubChunksLength() ;y++, i++) {
             int subChunkVersion = buffer.readUnsignedByte();
-            BlockStorage[] storages = Serializers.deserializeSubChunk(buffer, chunkHolder, blockPalette, subChunkVersion);
+            ChunkyBlockStorage[] storages = Serializers.deserializeSubChunk(buffer, chunkHolder, blockPalette, subChunkVersion);
             subChunks[y] = new SubChunkHolder(y, storages);
         }
         chunkHolder.setSubChunks(subChunks);

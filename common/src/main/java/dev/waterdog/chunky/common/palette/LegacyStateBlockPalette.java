@@ -29,11 +29,14 @@ public class LegacyStateBlockPalette extends StateBlockPalette implements BlockP
     }
 
     @Override
+    public int runtimeId2LegacyFullId(int runtimeId) {
+        return runtimeId;
+    }
+
     public int runtimeId2LegacyId(int runtimeId) {
         return runtimeId >> 6;
     }
 
-    @Override
     public int runtimeId2LegacyData(int runtimeId) {
         return runtimeId & 0xf;
     }
