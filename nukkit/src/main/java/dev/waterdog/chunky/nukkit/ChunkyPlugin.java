@@ -83,7 +83,7 @@ public class ChunkyPlugin extends PluginBase implements Listener {
         }
 
         ChunkyManager chunkyManager = new ChunkyManager(this.chunkyClient, level);
-        this.chunkyClient.setChunkListener(chunkyManager);
+        this.chunkyClient.setListener(chunkyManager);
         level.setGeneratorTaskFactory(chunkyManager);
     }
 }

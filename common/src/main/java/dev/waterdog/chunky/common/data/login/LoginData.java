@@ -26,11 +26,8 @@ import dev.waterdog.chunky.common.network.HandshakeUtils;
 import io.netty.util.AsciiString;
 import lombok.Data;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.util.Collections;
 import java.util.UUID;

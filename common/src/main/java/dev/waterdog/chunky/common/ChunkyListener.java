@@ -15,10 +15,12 @@
 
 package dev.waterdog.chunky.common;
 
+import dev.waterdog.chunky.common.data.ChunkRequest;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.network.ChunkyPeer;
 
-public interface UnhandledChunkListener {
+public interface ChunkyListener {
 
-    void onChunkReceived(ChunkHolder chunkHolder, ChunkyPeer peer);
+    void onUnhandledChunkReceived(ChunkHolder chunkHolder, ChunkyPeer peer);
+    void onChunkRequestTimeout(ChunkRequest request, ChunkyPeer peer);
 }

@@ -17,7 +17,6 @@ package dev.waterdog.chunky.nukkit.world;
 
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.scheduler.AsyncTask;
-import lombok.extern.log4j.Log4j2;
 
 public class ChunkyGeneratorTask extends AsyncTask {
 

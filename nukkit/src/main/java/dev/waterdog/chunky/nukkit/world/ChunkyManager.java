@@ -22,7 +22,8 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.generator.GeneratorTaskFactory;
 import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.scheduler.ServerScheduler;
-import dev.waterdog.chunky.common.UnhandledChunkListener;
+import dev.waterdog.chunky.common.ChunkyListener;
+import dev.waterdog.chunky.common.data.ChunkRequest;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.network.ChunkyClient;
 import dev.waterdog.chunky.common.network.ChunkyPeer;
@@ -31,7 +32,7 @@ import lombok.extern.log4j.Log4j2;
 
 
 @Log4j2
-public class ChunkyManager implements UnhandledChunkListener, GeneratorTaskFactory {
+public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
 
     private final ChunkyClient chunkyClient;
     private final Level level;
@@ -53,7 +54,7 @@ public class ChunkyManager implements UnhandledChunkListener, GeneratorTaskFacto
     }
 
     @Override
-    public void onChunkReceived(ChunkHolder chunkHolder, ChunkyPeer peer) {
+    public void onUnhandledChunkReceived(ChunkHolder chunkHolder, ChunkyPeer peer) {
         this.getScheduler().scheduleTask(() -> {
            BaseFullChunk baseChunk = this.level.getChunk(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), true);
            if (!baseChunk.isGenerated() || !baseChunk.isPopulated()) {
@@ -80,6 +81,11 @@ public class ChunkyManager implements UnhandledChunkListener, GeneratorTaskFacto
         this.getScheduler().scheduleTask(() -> {
             this.level.generateChunkCallback(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), chunk);
         });
+    }
+
+    @Override
+    public void onChunkRequestTimeout(ChunkRequest request, ChunkyPeer peer) {
+
     }
 
     private ServerScheduler getScheduler() {

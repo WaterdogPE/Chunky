@@ -18,6 +18,7 @@ package dev.waterdog.chunky.common.network;
 import com.nimbusds.jwt.SignedJWT;
 import com.nukkitx.math.vector.Vector2i;
 import com.nukkitx.math.vector.Vector3f;
+import com.nukkitx.network.util.DisconnectReason;
 import com.nukkitx.protocol.bedrock.BedrockClient;
 import com.nukkitx.protocol.bedrock.BedrockClientSession;
 import com.nukkitx.protocol.bedrock.BedrockPacketCodec;
@@ -70,6 +71,7 @@ public class ChunkyPeer implements BedrockPacketHandler {
 
     private final List<Long> chunkRequests = new CopyOnWriteArrayList<>(); // LongLists.synchronize(new LongArrayList());
     private final LongSet pendingChunks = new LongArraySet();
+    private long lastRequest;
 
     public ChunkyPeer(ChunkyClient parent, BedrockPacketCodec codec, InetSocketAddress targetAddress, EventLoop eventLoop) {
         this.parent = parent;
@@ -94,7 +96,11 @@ public class ChunkyPeer implements BedrockPacketHandler {
     private void onConnected(BedrockClientSession session) {
         this.session = session;
         session.setLogging(false);
-        session.addDisconnectHandler(reason -> this.close(reason.name()));
+        session.addDisconnectHandler(reason -> {
+            if (reason != DisconnectReason.DISCONNECTED) {
+                this.close(reason.name());
+            }
+        });
         session.setPacketHandler(this);
         session.setPacketCodec(this.loginData.getCodec());
         session.sendPacket(this.loginData.createLoginPacket());
@@ -138,6 +144,15 @@ public class ChunkyPeer implements BedrockPacketHandler {
             return;
         }
 
+        long currTime = System.currentTimeMillis();
+        if (currTime > this.lastRequest + (1000 * 2)) {
+            LongIterator iterator = this.pendingChunks.iterator();
+            while (iterator.hasNext()) {
+                this.parent.onPendingChunkTimeout(iterator.nextLong(), this);
+                iterator.remove();
+            }
+        }
+
         try {
             // Remove duplicates
             this.chunkRequests.removeIf((index) -> this.pendingChunks.contains((long) index));
@@ -164,10 +179,11 @@ public class ChunkyPeer implements BedrockPacketHandler {
         checkChunksInRadius(chunkX, chunkZ, radius, newChunks::add);
         // Remove chunks that we already got
         checkChunksInRadius(this.getChunkX(), this.getChunkZ(), radius, newChunks::remove);
-        // TODO: this.pendingChunks.addAll(newChunks);
+        // this.pendingChunks.addAll(newChunks);
         this.chunkRequests.removeAll(newChunks);
         // Change position
         this.clientData.updateAndSendPosition(Vector3f.from((chunkX << 4) + 10, 255, (chunkZ << 4) + 10), this.session);
+        this.lastRequest = System.currentTimeMillis();
     }
 
     protected void offerChunkRequestUnsafe(long index) {
