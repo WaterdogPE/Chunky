@@ -28,9 +28,7 @@ import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.data.chunk.SubChunkHolder;
 import dev.waterdog.chunky.common.palette.BlockPaletteLegacy;
 import dev.waterdog.chunky.nukkit.world.ChunkBuilder;
-import lombok.extern.log4j.Log4j2;
 
-@Log4j2
 public class AnvilChunkBuilder implements ChunkBuilder {
     public static final AnvilChunkBuilder INSTANCE = new AnvilChunkBuilder();
 

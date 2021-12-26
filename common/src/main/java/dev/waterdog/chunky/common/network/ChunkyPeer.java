@@ -37,7 +37,8 @@ import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.ScheduledFuture;
 import it.unimi.dsi.fastutil.longs.*;
 import lombok.Getter;
-import lombok.extern.log4j.Log4j2;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.crypto.SecretKey;
 import java.net.InetSocketAddress;
@@ -50,8 +51,9 @@ import java.util.concurrent.TimeUnit;
 
 import static dev.waterdog.chunky.common.util.ChunkUtils.*;
 
-@Log4j2
 public class ChunkyPeer implements BedrockPacketHandler {
+
+    private static final Logger log = LogManager.getLogger("Chunky");
 
     private final ChunkyClient parent;
     private final InetSocketAddress targetAddress;

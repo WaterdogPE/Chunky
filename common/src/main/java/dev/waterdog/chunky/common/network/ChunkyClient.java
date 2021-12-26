@@ -32,7 +32,8 @@ import it.unimi.dsi.fastutil.objects.ObjectSets;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
-import lombok.extern.log4j.Log4j2;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.net.InetSocketAddress;
 import java.util.Collection;
@@ -41,9 +42,10 @@ import java.util.concurrent.CompletableFuture;
 
 import static dev.waterdog.chunky.common.util.ChunkUtils.*;
 
-@Log4j2
 @Getter
 public class ChunkyClient {
+
+    private static final Logger log = LogManager.getLogger("Chunky");
 
     private final int peerCount;
     private final BedrockPacketCodec codec;
