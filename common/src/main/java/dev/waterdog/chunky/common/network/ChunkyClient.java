@@ -17,6 +17,8 @@ package dev.waterdog.chunky.common.network;
 
 import com.google.common.base.Preconditions;
 import com.nukkitx.network.raknet.util.RoundRobinIterator;
+import com.nukkitx.network.util.EventLoops;
+import com.nukkitx.network.util.NetworkThreadFactory;
 import com.nukkitx.protocol.bedrock.BedrockPacketCodec;
 import dev.waterdog.chunky.common.ChunkyListener;
 import dev.waterdog.chunky.common.data.ChunkRequest;
@@ -76,7 +78,12 @@ public class ChunkyClient {
         this.maxPendingRequests = maxPendingRequests;
         this.paletteFactory = paletteFactory;
         this.listener = chunkListener;
-        this.eventLoopGroup = new NioEventLoopGroup(peerCount);
+
+        NetworkThreadFactory factory = NetworkThreadFactory.builder()
+                .format("Chunky Listener - #%d")
+                .daemon(true)
+                .build();
+        this.eventLoopGroup = EventLoops.getChannelType().newEventLoopGroup(peerCount, factory);
     }
 
     public CompletableFuture<Void> connect() {

@@ -26,10 +26,14 @@ import com.nukkitx.protocol.bedrock.v388.Bedrock_v388;
 import dev.waterdog.chunky.common.network.ChunkyClient;
 import dev.waterdog.chunky.nukkit.palette.NukkitBlockPaletteFactory;
 import dev.waterdog.chunky.nukkit.world.ChunkyManager;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.net.InetSocketAddress;
 
 public class ChunkyPlugin extends PluginBase implements Listener {
+
+    private static final Logger log = LogManager.getLogger("Chunky");
 
     private ChunkyClient chunkyClient;
     private String worldName;
@@ -42,7 +46,7 @@ public class ChunkyPlugin extends PluginBase implements Listener {
             this.chunkyClient = this.buildClient();
         }
         this.worldName = this.getConfig().getString("world_name");
-        this.chunkyClient.connect();
+        this.chunkyClient.connect().whenComplete((v, error) -> this.onBindError(error));
 
         this.getServer().getPluginManager().registerEvents(this, this);
     }
@@ -52,6 +56,10 @@ public class ChunkyPlugin extends PluginBase implements Listener {
         if (this.chunkyClient != null) {
             this.chunkyClient.disconnect();
         }
+    }
+
+    private void onBindError(Throwable t) {
+        log.error("Failed to start Chunky peers", t);
     }
 
     private ChunkyClient buildClient() {
