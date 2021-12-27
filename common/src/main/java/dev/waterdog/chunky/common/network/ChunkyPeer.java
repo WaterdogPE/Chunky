@@ -350,10 +350,6 @@ public class ChunkyPeer implements BedrockPacketHandler {
             log.debug("[{}] Chunk: x={} z={}", this.getDisplayName(), packet.getChunkX(), packet.getChunkZ());
         }
 
-        if (this.loginState != LoginState.SPAWNED) {
-            return true;
-        }
-
         ByteBuf buffer = Unpooled.wrappedBuffer(packet.getData());
         ChunkHolder chunkHolder = new ChunkHolder(packet.getChunkX(), packet.getChunkZ(), packet.getSubChunksLength(), this.blockPalette);
         Serializers.deserializeChunk(buffer, chunkHolder, this.blockPalette, this.loginData.getVersion().getProtocol());
