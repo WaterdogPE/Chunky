@@ -21,66 +21,36 @@ import cn.nukkit.event.level.LevelLoadEvent;
 import cn.nukkit.level.Level;
 import cn.nukkit.plugin.PluginBase;
 import com.google.common.net.HostAndPort;
-import com.nukkitx.protocol.bedrock.BedrockPacketCodec;
-import com.nukkitx.protocol.bedrock.v388.Bedrock_v388;
 import dev.waterdog.chunky.common.network.ChunkyClient;
+import dev.waterdog.chunky.common.network.MinecraftVersion;
 import dev.waterdog.chunky.nukkit.palette.NukkitBlockPaletteFactory;
 import dev.waterdog.chunky.nukkit.world.ChunkyManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.net.InetSocketAddress;
+import java.util.HashSet;
+import java.util.Set;
 
 public class ChunkyPlugin extends PluginBase implements Listener {
 
     private static final Logger log = LogManager.getLogger("Chunky");
 
-    private ChunkyClient chunkyClient;
+    private final Set<ChunkyClient> clients = new HashSet<>();
     private String worldName;
 
     @Override
     public void onEnable() {
         this.saveDefaultConfig();
         NukkitBlockPaletteFactory.get();
-        if (this.chunkyClient == null) {
-            this.chunkyClient = this.buildClient();
-        }
         this.worldName = this.getConfig().getString("world_name");
-        this.chunkyClient.connect().whenComplete((v, error) -> this.onBindError(error));
-
         this.getServer().getPluginManager().registerEvents(this, this);
     }
 
     @Override
     public void onDisable() {
-        if (this.chunkyClient != null) {
-            this.chunkyClient.disconnect();
-        }
-    }
-
-    private void onBindError(Throwable t) {
-        log.error("Failed to start Chunky peers", t);
-    }
-
-    private ChunkyClient buildClient() {
-        int peerCount = this.getConfig().getInt("peer_count", 2);
-        int maxRequests = this.getConfig().getInt("max_pending_requests", 20);
-
-        HostAndPort hostAndPort = HostAndPort.fromString(this.getConfig().getString("target_address"));
-        InetSocketAddress address = new InetSocketAddress(hostAndPort.getHost(), hostAndPort.getPort());
-
-        String codecVersion = this.getConfig().getString("codec_version");
-        BedrockPacketCodec codec = Bedrock_v388.V388_CODEC; // TODO: parse from string
-        int raknetVersion = 9; // TODO:
-
-        return ChunkyClient.builder()
-                .peerCount(peerCount)
-                .codec(codec)
-                .raknetVersion(raknetVersion)
-                .targetAddress(address)
-                .paletteFactory(NukkitBlockPaletteFactory.get())
-                .maxPendingRequests(maxRequests)
-                .build();
+        this.clients.forEach(ChunkyClient::disconnect);
+        this.clients.clear();
     }
 
     @EventHandler
@@ -90,8 +60,41 @@ public class ChunkyPlugin extends PluginBase implements Listener {
             return;
         }
 
-        ChunkyManager chunkyManager = new ChunkyManager(this.chunkyClient, level);
-        this.chunkyClient.setListener(chunkyManager);
+        ChunkyClient client = this.buildClient();
+        ChunkyManager chunkyManager = new ChunkyManager(client, level);
+        client.setListener(chunkyManager);
         level.setGeneratorTaskFactory(chunkyManager);
+        client.connect().whenComplete((v, error) -> this.onBindError(error));
+        this.clients.add(client);
+    }
+
+    private void onBindError(Throwable t) {
+        log.error("Failed to start Chunky peers", t);
+    }
+
+    private ChunkyClient buildClient() {
+        int peerCount = this.getConfig().getInt("peer_count", 2);
+        int maxRequests = this.getConfig().getInt("max_pending_requests", 20);
+        boolean autoReconnect = this.getConfig().getBoolean("auto_reconnect");
+        long reconnectInterval = this.getConfig().getLong("reconnect_interval");
+
+        HostAndPort hostAndPort = HostAndPort.fromString(this.getConfig().getString("target_address"));
+        InetSocketAddress address = new InetSocketAddress(hostAndPort.getHost(), hostAndPort.getPort());
+
+        String codecVersion = this.getConfig().getString("codec_version");
+        MinecraftVersion version = MinecraftVersion.fromVersionString(codecVersion);
+        if (version == null) {
+            throw new IllegalStateException("Unknown version: " + codecVersion);
+        }
+
+        return ChunkyClient.builder()
+                .peerCount(peerCount)
+                .minecraftVersion(version)
+                .targetAddress(address)
+                .paletteFactory(NukkitBlockPaletteFactory.get())
+                .maxPendingRequests(maxRequests)
+                .autoReconnect(autoReconnect)
+                .reconnectInterval(reconnectInterval)
+                .build();
     }
 }

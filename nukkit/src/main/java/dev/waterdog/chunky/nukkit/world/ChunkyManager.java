@@ -19,11 +19,13 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.anvil.Anvil;
 import cn.nukkit.level.format.generic.BaseFullChunk;
+import cn.nukkit.level.generator.GeneratorTaskFactory;
 import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.scheduler.ServerScheduler;
 import dev.waterdog.chunky.common.ChunkyListener;
 import dev.waterdog.chunky.common.data.ChunkRequest;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
+import dev.waterdog.chunky.common.data.login.LoginState;
 import dev.waterdog.chunky.common.network.ChunkyClient;
 import dev.waterdog.chunky.common.network.ChunkyPeer;
 import dev.waterdog.chunky.nukkit.world.anvil.AnvilChunkBuilder;
@@ -32,26 +34,32 @@ import org.apache.logging.log4j.Logger;
 
 
 public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
-
     private static final Logger log = LogManager.getLogger("Chunky");
 
-    private final ChunkyClient chunkyClient;
+    private final ChunkyClient chunky;
     private final Level level;
 
     public ChunkyManager(ChunkyClient chunkyClient, Level level) {
-        this.chunkyClient = chunkyClient;
+        this.chunky = chunkyClient;
         this.level = level;
     }
 
     public void requestChunk(BaseFullChunk chunk) {
         log.info("Requesting chunk x={} z={}", chunk.getX(), chunk.getZ());
-        this.chunkyClient.requestChunk(chunk.getX(), chunk.getZ()).whenComplete(((chunkHolder, error) -> {
+        this.chunky.requestChunk(chunk.getX(), chunk.getZ()).whenComplete(((chunkHolder, error) -> {
             if (error != null) {
                 log.error("Failed to generate chunk", error);
             } else {
                 this.onChunkReceived(chunkHolder, chunk);
             }
         }));
+    }
+
+    private void requestChunkInternal(int chunkX, int chunkZ) {
+        BaseFullChunk baseChunk = this.level.getChunk(chunkX, chunkZ, true);
+        if (!baseChunk.isGenerated() || !baseChunk.isPopulated()) {
+            this.requestChunk(baseChunk);
+        }
     }
 
     @Override
@@ -84,7 +92,11 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
 
     @Override
     public void onChunkRequestTimeout(ChunkRequest request, ChunkyPeer peer) {
-
+        log.warn("Chunk request x={} z={} timed out", request.getChunkX(), request.getChunkZ());
+        if (!peer.canRequestChunks()) {
+            // Peer was closed or is reconnecting
+            this.getScheduler().scheduleDelayedTask(() -> this.requestChunkInternal(request.getChunkX(), request.getChunkZ()), 15);
+        }
     }
 
     private ServerScheduler getScheduler() {

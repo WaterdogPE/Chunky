@@ -23,6 +23,7 @@ import com.nukkitx.protocol.bedrock.BedrockPacketCodec;
 import com.nukkitx.protocol.bedrock.packet.LoginPacket;
 import com.nukkitx.protocol.bedrock.util.EncryptionUtils;
 import dev.waterdog.chunky.common.network.HandshakeUtils;
+import dev.waterdog.chunky.common.network.MinecraftVersion;
 import io.netty.util.AsciiString;
 import lombok.Data;
 
@@ -114,14 +115,14 @@ public class LoginData {
     }
 
     private final KeyPair keyPair = EncryptionUtils.createKeyPair();
-    private final BedrockPacketCodec codec;
+    private final MinecraftVersion version;
     private final IdentityData identityData;
     private final ExtraData extraData;
 
-    public LoginData(BedrockPacketCodec codec) {
-        this.codec = codec;
-        this.identityData = buildIdentityData(codec);
-        this.extraData = buildExtraData(codec);
+    public LoginData(MinecraftVersion version) {
+        this.version = version;
+        this.identityData = buildIdentityData(version.getCodec());
+        this.extraData = buildExtraData(version.getCodec());
     }
 
     public LoginPacket createLoginPacket() {
@@ -135,7 +136,7 @@ public class LoginData {
         LoginPacket loginPacket = new LoginPacket();
         loginPacket.setChainData(chainData);
         loginPacket.setSkinData(AsciiString.of(signedExtraData.serialize()));
-        loginPacket.setProtocolVersion(this.codec.getProtocolVersion());
+        loginPacket.setProtocolVersion(this.version.getProtocol());
         return loginPacket;
     }
 }

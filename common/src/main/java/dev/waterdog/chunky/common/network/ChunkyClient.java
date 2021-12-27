@@ -19,13 +19,11 @@ import com.google.common.base.Preconditions;
 import com.nukkitx.network.raknet.util.RoundRobinIterator;
 import com.nukkitx.network.util.EventLoops;
 import com.nukkitx.network.util.NetworkThreadFactory;
-import com.nukkitx.protocol.bedrock.BedrockPacketCodec;
 import dev.waterdog.chunky.common.ChunkyListener;
 import dev.waterdog.chunky.common.data.ChunkRequest;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.palette.BlockPaletteFactory;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -41,6 +39,7 @@ import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static dev.waterdog.chunky.common.util.ChunkUtils.*;
 
@@ -50,10 +49,12 @@ public class ChunkyClient {
     private static final Logger log = LogManager.getLogger("Chunky");
 
     private final int peerCount;
-    private final BedrockPacketCodec codec;
-    private final int raknetVersion;
+    private final MinecraftVersion minecraftVersion;
     private final InetSocketAddress targetAddress;
     private final int maxPendingRequests;
+
+    private final boolean autoReconnect;
+    private final long reconnectInterval;
 
     private final BlockPaletteFactory paletteFactory;
     @Setter
@@ -70,12 +71,14 @@ public class ChunkyClient {
         return new Builder();
     }
 
-    public ChunkyClient(int peerCount, BedrockPacketCodec codec, int raknetVersion, InetSocketAddress targetAddress, int maxPendingRequests, BlockPaletteFactory paletteFactory, ChunkyListener chunkListener) {
+    public ChunkyClient(int peerCount, MinecraftVersion minecraftVersion, InetSocketAddress targetAddress, int maxPendingRequests, boolean autoReconnect,
+                        long reconnectInterval, BlockPaletteFactory paletteFactory, ChunkyListener chunkListener) {
         this.peerCount = peerCount;
-        this.codec = codec;
-        this.raknetVersion = raknetVersion;
+        this.minecraftVersion = minecraftVersion;
         this.targetAddress = targetAddress;
         this.maxPendingRequests = maxPendingRequests;
+        this.autoReconnect = autoReconnect;
+        this.reconnectInterval = reconnectInterval;
         this.paletteFactory = paletteFactory;
         this.listener = chunkListener;
 
@@ -92,7 +95,7 @@ public class ChunkyClient {
 
         CompletableFuture<Void>[] futures = new CompletableFuture[this.peerCount];
         for (int i = 0; i < this.peerCount; i++) {
-            ChunkyPeer peer = new ChunkyPeer(this, this.codec, this.targetAddress, this.eventLoopGroup.next());
+            ChunkyPeer peer = new ChunkyPeer(this, this.minecraftVersion, this.targetAddress, this.eventLoopGroup.next());
             this.peers.add(peer);
             futures[i] = peer.start();
         }
@@ -132,6 +135,20 @@ public class ChunkyClient {
         return request.getFuture();
     }
 
+    protected void onPeerDisconnected(ChunkyPeer peer) {
+        if (this.running && this.autoReconnect) {
+            log.info("[{}] attempting to reconnect in {} seconds", peer.getDisplayName(), this.reconnectInterval);
+            this.eventLoopGroup.schedule(() -> this.reconnectPeer(peer), this.reconnectInterval, TimeUnit.SECONDS);
+        }
+    }
+
+    private void reconnectPeer(ChunkyPeer peer) {
+        CompletableFuture<Void> future = peer.start();
+        if (this.listener != null) {
+            this.listener.onPeerReconnect(peer, future);
+        }
+    }
+
     protected void onChunkDeserializedCallback(ChunkHolder chunkHolder, ChunkyPeer peer) {
         long index = chunkIndex(chunkHolder.getChunkX(), chunkHolder.getChunkZ());
         ChunkRequest request = this.pendingChunkRequests.remove(index);
@@ -150,7 +167,7 @@ public class ChunkyClient {
         if (request == null) {
             return;
         }
-        log.warn("[{}] pending chunks timeout: {}", peer.getDisplayName(), index);
+        log.info("[{}] pending chunk timeout: {}", peer.getDisplayName(), index);
 
         if (this.listener != null) {
             this.listener.onChunkRequestTimeout(request, peer);
@@ -191,15 +208,17 @@ public class ChunkyClient {
     @Accessors(fluent = true)
     public static class Builder {
         private int peerCount;
-        private BedrockPacketCodec codec;
-        private int raknetVersion;
+        private MinecraftVersion minecraftVersion;
         private InetSocketAddress targetAddress;
         private int maxPendingRequests;
+        private boolean autoReconnect;
+        private long reconnectInterval;
         private BlockPaletteFactory paletteFactory;
         private ChunkyListener listener;
 
         public ChunkyClient build() {
-            return new ChunkyClient(this.peerCount, this.codec, this.raknetVersion, this.targetAddress, this.maxPendingRequests, this.paletteFactory, this.listener);
+            return new ChunkyClient(this.peerCount, minecraftVersion, this.targetAddress, this.maxPendingRequests, this.autoReconnect, this.reconnectInterval,
+                    this.paletteFactory, this.listener);
         }
     }
 }

@@ -19,8 +19,16 @@ import dev.waterdog.chunky.common.data.ChunkRequest;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.network.ChunkyPeer;
 
+import java.util.concurrent.CompletableFuture;
+
 public interface ChunkyListener {
 
-    void onUnhandledChunkReceived(ChunkHolder chunkHolder, ChunkyPeer peer);
-    void onChunkRequestTimeout(ChunkRequest request, ChunkyPeer peer);
+    default void onPeerReconnect(ChunkyPeer peer, CompletableFuture<Void> reconnectFuture) {
+    }
+
+    default void onUnhandledChunkReceived(ChunkHolder chunkHolder, ChunkyPeer peer) {
+    }
+
+    default void onChunkRequestTimeout(ChunkRequest request, ChunkyPeer peer) {
+    }
 }

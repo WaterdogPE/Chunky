@@ -21,7 +21,6 @@ import com.nukkitx.math.vector.Vector3f;
 import com.nukkitx.network.util.DisconnectReason;
 import com.nukkitx.protocol.bedrock.BedrockClient;
 import com.nukkitx.protocol.bedrock.BedrockClientSession;
-import com.nukkitx.protocol.bedrock.BedrockPacketCodec;
 import com.nukkitx.protocol.bedrock.handler.BedrockPacketHandler;
 import com.nukkitx.protocol.bedrock.packet.*;
 import com.nukkitx.protocol.bedrock.util.EncryptionUtils;
@@ -54,6 +53,7 @@ import static dev.waterdog.chunky.common.util.ChunkUtils.*;
 public class ChunkyPeer implements BedrockPacketHandler {
 
     private static final Logger log = LogManager.getLogger("Chunky");
+    private static final int SESSION_TIMEOUT = 5000;
 
     private final ChunkyClient parent;
     private final InetSocketAddress targetAddress;
@@ -72,14 +72,14 @@ public class ChunkyPeer implements BedrockPacketHandler {
     private ScheduledFuture<?> tickFuture;
 
     private final List<Long> chunkRequests = new CopyOnWriteArrayList<>(); // LongLists.synchronize(new LongArrayList());
-    private final LongSet pendingChunks = new LongArraySet();
+    private final LongSet pendingChunks = LongSets.synchronize(new LongArraySet());
     private long lastRequest;
 
-    public ChunkyPeer(ChunkyClient parent, BedrockPacketCodec codec, InetSocketAddress targetAddress, EventLoop eventLoop) {
+    public ChunkyPeer(ChunkyClient parent, MinecraftVersion version, InetSocketAddress targetAddress, EventLoop eventLoop) {
         this.parent = parent;
         this.targetAddress = targetAddress;
         this.eventLoop = eventLoop;
-        this.loginData = new LoginData(codec);
+        this.loginData = new LoginData(version);
     }
 
     public CompletableFuture<Void> start() {
@@ -90,8 +90,13 @@ public class ChunkyPeer implements BedrockPacketHandler {
         }
 
         this.bedrockClient = new BedrockClient(new InetSocketAddress("0.0.0.0", 0), this.eventLoop);
-        this.bedrockClient.setRakNetVersion(this.parent.getRaknetVersion());
+        this.bedrockClient.setRakNetVersion(this.loginData.getVersion().getRaknetVersion());
         CompletableFuture<BedrockClientSession> future = this.bedrockClient.bind().thenCompose(v -> this.bedrockClient.connect(this.targetAddress));
+        future.whenComplete((session, error) -> {
+            if (error != null) {
+                this.bedrockClient.close(false);
+            }
+        });
         return future.thenAccept(this::onConnected);
     }
 
@@ -104,18 +109,21 @@ public class ChunkyPeer implements BedrockPacketHandler {
             }
         });
         session.setPacketHandler(this);
-        session.setPacketCodec(this.loginData.getCodec());
+        session.setPacketCodec(this.loginData.getVersion().getCodec());
         session.sendPacket(this.loginData.createLoginPacket());
+        this.bedrockClient.getRakNet().getSession().setSessionTimeout(SESSION_TIMEOUT);
         log.info("[{}] started with login sequence", this.getDisplayName());
     }
 
     private void onLogin() {
+        this.loginState = LoginState.LOGIN;
         this.session.sendPacket(this.clientData.cacheStatusPacket());
     }
 
     private void doSpawn() {
-        log.info("[{}] has spawned and is ready for incoming chunks!", this.getDisplayName());
+        this.loginState = LoginState.SPAWNED;
         this.tickFuture = this.eventLoop.scheduleAtFixedRate(this::onTick, 0, 200, TimeUnit.MILLISECONDS);
+        log.info("[{}] has spawned and is ready for incoming chunks!", this.getDisplayName());
     }
 
     public void close(String reason) {
@@ -125,8 +133,15 @@ public class ChunkyPeer implements BedrockPacketHandler {
         if (this.tickFuture != null) {
             this.tickFuture.cancel(true);
         }
+
         log.info("[{}] with state {} was closed: {}", this.getDisplayName(), this.loginState, reason);
         this.loginState = LoginState.CLOSED;
+
+        // Prepare for possible reconnection
+        this.session = null;
+        this.bedrockClient = null;
+        // Call listener
+        this.parent.onPeerDisconnected(this);
     }
 
     public boolean requestChunk(long chunkIndex) {
@@ -142,7 +157,7 @@ public class ChunkyPeer implements BedrockPacketHandler {
     }
 
     private void onTick() {
-        if (this.loginState == LoginState.CLOSED || this.session == null || this.session.isClosed()) {
+        if (!this.canRequestChunks() || this.session == null || this.session.isClosed()) {
             return;
         }
 
@@ -181,8 +196,9 @@ public class ChunkyPeer implements BedrockPacketHandler {
         checkChunksInRadius(chunkX, chunkZ, radius, newChunks::add);
         // Remove chunks that we already got
         checkChunksInRadius(this.getChunkX(), this.getChunkZ(), radius, newChunks::remove);
-        // this.pendingChunks.addAll(newChunks);
+        this.pendingChunks.addAll(newChunks);
         this.chunkRequests.removeAll(newChunks);
+
         // Change position
         this.clientData.updateAndSendPosition(Vector3f.from((chunkX << 4) + 10, 255, (chunkZ << 4) + 10), this.session);
         this.lastRequest = System.currentTimeMillis();
@@ -193,7 +209,6 @@ public class ChunkyPeer implements BedrockPacketHandler {
     }
 
     protected void offerChunkUnsafe(long index) {
-        // this.eventLoop.execute(() -> this.pendingChunks.add(index));
         this.pendingChunks.add(index);
     }
 
@@ -225,6 +240,10 @@ public class ChunkyPeer implements BedrockPacketHandler {
         return Collections.unmodifiableCollection(this.pendingChunks);
     }
 
+    public boolean canRequestChunks() {
+        return this.loginState == LoginState.SPAWNED;
+    }
+
     // Handlers
 
     @Override
@@ -250,11 +269,9 @@ public class ChunkyPeer implements BedrockPacketHandler {
     public boolean handle(PlayStatusPacket packet) {
         switch (packet.getStatus()) {
             case LOGIN_SUCCESS:
-                this.loginState = LoginState.LOGIN;
                 this.onLogin();
                 break;
             case PLAYER_SPAWN:
-                this.loginState = LoginState.SPAWNED;
                 this.doSpawn();
                 break;
             default:
@@ -297,7 +314,7 @@ public class ChunkyPeer implements BedrockPacketHandler {
             this.clientData.setMovementMode(packet.getPlayerMovementSettings().getMovementMode());
         }
         this.blockPalette = this.parent.getPaletteFactory()
-                .createLegacyBlockPalette(packet.getBlockPalette(), this.loginData.getCodec().getProtocolVersion());
+                .createLegacyBlockPalette(packet.getBlockPalette(), this.loginData.getVersion().getProtocol());
         // Request chunk radius
         this.session.sendPacket(this.clientData.radiusPacket());
         // Confirm received position
@@ -339,7 +356,7 @@ public class ChunkyPeer implements BedrockPacketHandler {
 
         ByteBuf buffer = Unpooled.wrappedBuffer(packet.getData());
         ChunkHolder chunkHolder = new ChunkHolder(packet.getChunkX(), packet.getChunkZ(), packet.getSubChunksLength(), this.blockPalette);
-        Serializers.deserializeChunk(buffer, chunkHolder, this.blockPalette, this.loginData.getCodec().getProtocolVersion());
+        Serializers.deserializeChunk(buffer, chunkHolder, this.blockPalette, this.loginData.getVersion().getProtocol());
 
         long chunkIndex = chunkIndex(packet.getChunkX(), packet.getChunkZ());
         if (!this.pendingChunks.remove(chunkIndex) && log.isDebugEnabled()) {
