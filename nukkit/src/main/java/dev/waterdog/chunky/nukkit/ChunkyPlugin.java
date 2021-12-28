@@ -64,7 +64,11 @@ public class ChunkyPlugin extends PluginBase implements Listener {
         ChunkyManager chunkyManager = new ChunkyManager(client, level);
         client.setListener(chunkyManager);
         level.setGeneratorTaskFactory(chunkyManager);
-        client.connect().whenComplete((v, error) -> this.onBindError(error));
+        client.connect().whenComplete((v, error) -> {
+            if (error != null) {
+                this.onBindError(error);
+            }
+        });
         this.clients.add(client);
     }
 
