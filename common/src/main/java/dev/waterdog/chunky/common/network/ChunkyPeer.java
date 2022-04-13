@@ -29,6 +29,7 @@ import dev.waterdog.chunky.common.data.login.LoginData;
 import dev.waterdog.chunky.common.data.login.LoginState;
 import dev.waterdog.chunky.common.data.PeerClientData;
 import dev.waterdog.chunky.common.palette.BlockPaletteLegacy;
+import dev.waterdog.chunky.common.palette.VanillaBlockStates;
 import dev.waterdog.chunky.common.serializer.Serializers;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -313,8 +314,14 @@ public class ChunkyPeer implements BedrockPacketHandler {
         if (packet.getPlayerMovementSettings() != null) {
             this.clientData.setMovementMode(packet.getPlayerMovementSettings().getMovementMode());
         }
-        this.blockPalette = this.parent.getPaletteFactory()
-                .createLegacyBlockPalette(packet.getBlockPalette(), this.loginData.getVersion().getProtocol());
+
+        if (this.parent.getMinecraftVersion().isBefore(MinecraftVersion.MINECRAFT_PE_1_16)) {
+            this.blockPalette = this.parent.getPaletteFactory()
+                    .createLegacyBlockPalette(packet.getBlockPalette(), this.loginData.getVersion().getProtocol());
+        } else {
+            this.blockPalette = VanillaBlockStates.get().getVanillaPalette(this.parent.getMinecraftVersion());
+        }
+
         // Request chunk radius
         this.session.sendPacket(this.clientData.radiusPacket());
         // Confirm received position

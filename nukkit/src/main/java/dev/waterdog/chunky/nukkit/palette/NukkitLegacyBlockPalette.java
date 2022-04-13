@@ -37,7 +37,7 @@ public class NukkitLegacyBlockPalette implements BlockPaletteLegacy {
     private final Int2ObjectMap<NbtMap> legacyId2UpdatedStateMap = new Int2ObjectOpenHashMap<>();
     private final int version;
 
-    public NukkitLegacyBlockPalette(NbtList<NbtMap> mapping, int version, NukkitBlockPaletteFactory factory) {
+    public NukkitLegacyBlockPalette(List<NbtMap> mapping, int version, NukkitBlockPaletteFactory factory) {
         this.state2RuntimeMap.defaultReturnValue(-1);
         this.runtime2FullIdMap.defaultReturnValue(-1);
         for (int i = 0; i < mapping.size(); i++) {
@@ -55,7 +55,7 @@ public class NukkitLegacyBlockPalette implements BlockPaletteLegacy {
         this.state2RuntimeMap.put(state, runtimeId);
 
         // Setup mapping to latest states here so we don't do it on runtime
-        NbtMap blockState = state.getCompound("block");
+        NbtMap blockState = state.containsKey("block") ? state.getCompound("block") : state;
         NbtMap updatedState = BlockStateUpdaters.updateBlockState(blockState, blockState.getInt("version"));
         int updatedRuntimeId = factory.state2Runtime(updatedState);
         int legacyFullId = GlobalBlockPalette.getLegacyFullId(updatedRuntimeId);

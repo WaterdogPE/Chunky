@@ -15,8 +15,9 @@
 
 package dev.waterdog.chunky.common.palette;
 
-import com.nukkitx.nbt.NbtList;
 import com.nukkitx.nbt.NbtMap;
+
+import java.util.List;
 
 public class LegacyStateBlockPalette extends StateBlockPalette implements BlockPaletteLegacy {
 
@@ -24,7 +25,7 @@ public class LegacyStateBlockPalette extends StateBlockPalette implements BlockP
      * This implementation of legacy block palette assumes legacy full IDs are same as runtime IDs
      */
 
-    public LegacyStateBlockPalette(NbtList<NbtMap> mapping) {
+    public LegacyStateBlockPalette(List<NbtMap> mapping) {
         super(mapping);
     }
 

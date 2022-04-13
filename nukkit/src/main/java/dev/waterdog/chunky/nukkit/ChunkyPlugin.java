@@ -23,6 +23,7 @@ import cn.nukkit.plugin.PluginBase;
 import com.google.common.net.HostAndPort;
 import dev.waterdog.chunky.common.network.ChunkyClient;
 import dev.waterdog.chunky.common.network.MinecraftVersion;
+import dev.waterdog.chunky.common.palette.VanillaBlockStates;
 import dev.waterdog.chunky.nukkit.palette.NukkitBlockPaletteFactory;
 import dev.waterdog.chunky.nukkit.world.ChunkyManager;
 import org.apache.logging.log4j.LogManager;
@@ -89,6 +90,10 @@ public class ChunkyPlugin extends PluginBase implements Listener {
         MinecraftVersion version = MinecraftVersion.fromVersionString(codecVersion);
         if (version == null) {
             throw new IllegalStateException("Unknown version: " + codecVersion);
+        }
+
+        if (version.isAfter(MinecraftVersion.MINECRAFT_PE_1_14_60)) {
+            VanillaBlockStates.get().getOrCreatePalette(version, NukkitBlockPaletteFactory.get());
         }
 
         return ChunkyClient.builder()

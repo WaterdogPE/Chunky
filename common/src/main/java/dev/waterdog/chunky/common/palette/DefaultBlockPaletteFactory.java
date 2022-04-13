@@ -15,19 +15,20 @@
 
 package dev.waterdog.chunky.common.palette;
 
-import com.nukkitx.nbt.NbtList;
 import com.nukkitx.nbt.NbtMap;
+
+import java.util.List;
 
 public class DefaultBlockPaletteFactory implements BlockPaletteFactory {
     public static final DefaultBlockPaletteFactory INSTANCE = new DefaultBlockPaletteFactory();
 
     @Override
-    public BlockPalette createBlockPalette(NbtList<NbtMap> blockStates, int version) {
+    public BlockPalette createBlockPalette(List<NbtMap> blockStates, int version) {
         return new StateBlockPalette(blockStates);
     }
 
     @Override
-    public BlockPaletteLegacy createLegacyBlockPalette(NbtList<NbtMap> blockStates, int version) {
+    public BlockPaletteLegacy createLegacyBlockPalette(List<NbtMap> blockStates, int version) {
         return new LegacyStateBlockPalette(blockStates);
     }
 }

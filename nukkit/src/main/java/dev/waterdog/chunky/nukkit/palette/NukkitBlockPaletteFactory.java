@@ -17,7 +17,6 @@ package dev.waterdog.chunky.nukkit.palette;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.nukkitx.nbt.NbtList;
 import com.nukkitx.nbt.NbtMap;
 import com.nukkitx.nbt.NbtType;
 import com.nukkitx.nbt.NbtUtils;
@@ -73,12 +72,12 @@ public class NukkitBlockPaletteFactory implements BlockPaletteFactory {
     }
 
     @Override
-    public BlockPalette createBlockPalette(NbtList<NbtMap> blockStates, int version) {
+    public BlockPalette createBlockPalette(List<NbtMap> blockStates, int version) {
         return new NukkitLegacyBlockPalette(blockStates, version, this);
     }
 
     @Override
-    public BlockPaletteLegacy createLegacyBlockPalette(NbtList<NbtMap> blockStates, int version) {
+    public BlockPaletteLegacy createLegacyBlockPalette(List<NbtMap> blockStates, int version) {
         return new NukkitLegacyBlockPalette(blockStates, version, this);
     }
 }

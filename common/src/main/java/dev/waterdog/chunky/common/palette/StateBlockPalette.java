@@ -16,19 +16,20 @@
 package dev.waterdog.chunky.common.palette;
 
 import com.google.common.base.Preconditions;
-import com.nukkitx.nbt.NbtList;
 import com.nukkitx.nbt.NbtMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 
+import java.util.List;
+
 public class StateBlockPalette implements BlockPalette {
 
     private final Int2ObjectMap<NbtMap> runtime2StateMap = new Int2ObjectOpenHashMap<>();
     private final Object2IntMap<NbtMap> state2RuntimeMap = new Object2IntOpenHashMap<>();
 
-    public StateBlockPalette(NbtList<NbtMap> mapping) {
+    public StateBlockPalette(List<NbtMap> mapping) {
         this.state2RuntimeMap.defaultReturnValue(-1);
         for (int i = 0; i < mapping.size(); i++) {
             this.registerState(mapping.get(i), i);

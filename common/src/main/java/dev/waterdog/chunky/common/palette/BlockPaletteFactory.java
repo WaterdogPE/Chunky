@@ -15,12 +15,13 @@
 
 package dev.waterdog.chunky.common.palette;
 
-import com.nukkitx.nbt.NbtList;
 import com.nukkitx.nbt.NbtMap;
+
+import java.util.List;
 
 public interface BlockPaletteFactory {
 
-    BlockPalette createBlockPalette(NbtList<NbtMap> blockStates, int version);
+    BlockPalette createBlockPalette(List<NbtMap> blockStates, int version);
 
-    BlockPaletteLegacy createLegacyBlockPalette(NbtList<NbtMap> blockStates, int version);
+    BlockPaletteLegacy createLegacyBlockPalette(List<NbtMap> blockStates, int version);
 }

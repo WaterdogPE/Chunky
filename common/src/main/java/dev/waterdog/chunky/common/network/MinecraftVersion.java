@@ -30,6 +30,7 @@ import com.nukkitx.protocol.bedrock.v448.Bedrock_v448;
 import com.nukkitx.protocol.bedrock.v465.Bedrock_v465;
 import com.nukkitx.protocol.bedrock.v471.Bedrock_v471;
 import com.nukkitx.protocol.bedrock.v475.Bedrock_v475;
+import com.nukkitx.protocol.bedrock.v486.Bedrock_v486;
 import lombok.ToString;
 
 @ToString(exclude = {"bedrockCodec"})
@@ -48,7 +49,8 @@ public enum MinecraftVersion {
     MINECRAFT_PE_1_17_10(448, Bedrock_v448.V448_CODEC, 10),
     MINECRAFT_PE_1_17_30(465, Bedrock_v465.V465_CODEC, 10),
     MINECRAFT_PE_1_17_40(471, Bedrock_v471.V471_CODEC, 10),
-    MINECRAFT_PE_1_18_0(475, Bedrock_v475.V475_CODEC, 10);
+    MINECRAFT_PE_1_18_0(475, Bedrock_v475.V475_CODEC, 10),
+    MINECRAFT_PE_1_18_10(486, Bedrock_v486.V486_CODEC, 10);
 
     public static final MinecraftVersion[] VALUES = values();
 
@@ -98,6 +100,15 @@ public enum MinecraftVersion {
     public static MinecraftVersion fromVersionString(String version) {
         for (MinecraftVersion minecraftVersion : VALUES) {
             if (minecraftVersion.getMinecraftVersion().equals(version)) {
+                return minecraftVersion;
+            }
+        }
+        return null;
+    }
+
+    public static MinecraftVersion fromProtocol(int protocol) {
+        for (MinecraftVersion minecraftVersion : VALUES) {
+            if (minecraftVersion.getProtocol() == protocol) {
                 return minecraftVersion;
             }
         }

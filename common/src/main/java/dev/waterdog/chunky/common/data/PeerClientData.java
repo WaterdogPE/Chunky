@@ -58,7 +58,7 @@ public class PeerClientData {
             packet.setRuntimeEntityId(this.entityId);
             packet.setPosition(position);
             packet.setRotation(Vector3f.ZERO);
-            packet.setMode(MovePlayerPacket.Mode.NORMAL); // TODO: maybe teleport
+            packet.setMode(MovePlayerPacket.Mode.NORMAL);
             packet.setOnGround(false);
             packet.setEntityType(0);
             packet.setTick(0);
@@ -69,9 +69,9 @@ public class PeerClientData {
             packet.setRotation(Vector3f.ZERO);
             packet.setMotion(Vector2f.from(this.position.getX() - position.getX(), this.position.getZ() - position.getZ()));
             packet.setInputMode(InputMode.MOTION_CONTROLLER);
-            // packet.getInputData().add(Plaa)
             packet.setPlayMode(ClientPlayMode.NORMAL);
             packet.setDelta(this.position.sub(position));
+            packet.setTick(0); // TODO:
             session.sendPacket(packet);
         }
         this.position = position;
