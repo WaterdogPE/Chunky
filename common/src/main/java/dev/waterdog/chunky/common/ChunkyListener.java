@@ -15,6 +15,8 @@
 
 package dev.waterdog.chunky.common;
 
+import com.nukkitx.math.vector.Vector3i;
+import com.nukkitx.nbt.NbtMap;
 import dev.waterdog.chunky.common.data.ChunkRequest;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.network.ChunkyPeer;
@@ -27,6 +29,9 @@ public interface ChunkyListener {
     }
 
     default void onUnhandledChunkReceived(ChunkHolder chunkHolder, ChunkyPeer peer) {
+    }
+
+    default void onBlockEntityUpdate(Vector3i position, NbtMap nbt) {
     }
 
     default void onChunkRequestTimeout(ChunkRequest request, ChunkyPeer peer) {

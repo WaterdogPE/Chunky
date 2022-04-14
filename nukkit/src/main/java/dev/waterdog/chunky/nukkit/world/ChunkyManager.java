@@ -15,22 +15,34 @@
 
 package dev.waterdog.chunky.nukkit.world;
 
+import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.anvil.Anvil;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.generator.GeneratorTaskFactory;
+import cn.nukkit.math.Vector3;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.scheduler.ServerScheduler;
+import com.nukkitx.math.vector.Vector3i;
+import com.nukkitx.nbt.NBTOutputStream;
+import com.nukkitx.nbt.NbtMap;
+import com.nukkitx.nbt.NbtUtils;
 import dev.waterdog.chunky.common.ChunkyListener;
 import dev.waterdog.chunky.common.data.ChunkRequest;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
-import dev.waterdog.chunky.common.data.login.LoginState;
 import dev.waterdog.chunky.common.network.ChunkyClient;
 import dev.waterdog.chunky.common.network.ChunkyPeer;
 import dev.waterdog.chunky.nukkit.world.anvil.AnvilChunkBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.List;
 
 
 public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
@@ -87,7 +99,41 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
         chunk.setGenerated();
         chunk.setPopulated();
 
-        this.getScheduler().scheduleTask(() -> this.level.generateChunkCallback(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), chunk));
+        List<CompoundTag> blockEntities = BlockEntityLoader.get().loadBlockEntities(chunk, chunkHolder, this.chunky.getMinecraftVersion());
+        this.getScheduler().scheduleTask(() -> {
+            this.level.generateChunkCallback(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), chunk);
+            if (blockEntities != null) {
+                BaseFullChunk fullChunk = this.level.getChunk(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), false);
+                for (CompoundTag nbt : blockEntities) {
+                    BlockEntityLoader.get().spawnBlockEntity(fullChunk, nbt);
+                }
+            }
+        });
+    }
+
+    @Override
+    public void onBlockEntityUpdate(Vector3i position, NbtMap nbt) {
+        try {
+            CompoundTag compoundTag = convertNbtMap(nbt);
+            compoundTag.putInt("x", position.getX());
+            compoundTag.putInt("y", position.getY());
+            compoundTag.putInt("z", position.getZ());
+            this.getScheduler().scheduleTask(() -> this.createBlockEntity(position, compoundTag));
+        } catch (IOException e) {
+            log.error("Failed to convert NbtMap", e);
+        }
+    }
+
+    private void createBlockEntity(Vector3i position, CompoundTag nbt) {
+        BlockEntity blockEntity = this.level.getBlockEntity(new Vector3(position.getX(), position.getY(), position.getZ()));
+        if (blockEntity != null && blockEntity.isValid()) {
+            return;
+        }
+        BaseFullChunk chunk = this.level.getChunkIfLoaded(position.getX(), position.getZ());
+        CompoundTag compoundTag = BlockEntityLoader.get().createBlockEntityNBT(nbt.getString("id"), nbt, chunk);
+        if (compoundTag != null) {
+            BlockEntityLoader.get().spawnBlockEntity(chunk, compoundTag);
+        }
     }
 
     @Override
@@ -111,5 +157,15 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
     @Override
     public AsyncTask generateChunkTask(BaseFullChunk chunk, Level level) {
         return new ChunkyGeneratorTask(this, chunk);
+    }
+
+    public static CompoundTag convertNbtMap(NbtMap nbt) throws IOException {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        try (NBTOutputStream nbtOutputStream = NbtUtils.createWriter(stream)){
+            nbtOutputStream.writeTag(nbt);
+        } finally {
+            stream.close();
+        }
+        return NBTIO.read(stream.toByteArray(), ByteOrder.BIG_ENDIAN, false);
     }
 }

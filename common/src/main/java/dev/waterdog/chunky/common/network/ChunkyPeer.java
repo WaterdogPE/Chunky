@@ -368,4 +368,10 @@ public class ChunkyPeer implements BedrockPacketHandler {
         this.parent.onChunkDeserializedCallback(chunkHolder, this);
         return true;
     }
+
+    @Override
+    public boolean handle(BlockEntityDataPacket packet) {
+        this.parent.getListener().onBlockEntityUpdate(packet.getBlockPosition(), packet.getData());
+        return true;
+    }
 }
