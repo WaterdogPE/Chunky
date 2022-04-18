@@ -130,6 +130,10 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
             return;
         }
         BaseFullChunk chunk = this.level.getChunkIfLoaded(position.getX(), position.getZ());
+        if (chunk == null) {
+            return;
+        }
+
         CompoundTag compoundTag = BlockEntityLoader.get().createBlockEntityNBT(nbt.getString("id"), nbt, chunk);
         if (compoundTag != null) {
             BlockEntityLoader.get().spawnBlockEntity(chunk, compoundTag);
