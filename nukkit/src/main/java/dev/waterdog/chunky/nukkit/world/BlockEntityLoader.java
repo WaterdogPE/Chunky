@@ -33,24 +33,24 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
 import java.util.List;
-import java.util.function.BiFunction;
 
 public class BlockEntityLoader {
 
     private static final Logger log = LogManager.getLogger("Chunky");
     private static final BlockEntityLoader INSTANCE = new BlockEntityLoader();
 
-    private final Object2ObjectMap<String, BiFunction<CompoundTag, BaseFullChunk, CompoundTag>> factories = new Object2ObjectOpenHashMap<>();
+    private final Object2ObjectMap<String, BlockEntityFactory> factories = new Object2ObjectOpenHashMap<>();
 
     public static BlockEntityLoader get() {
         return INSTANCE;
     }
 
     public BlockEntityLoader() {
-        this.registerFactory(BlockEntity.CHEST, this::onChestBlockEntity);
+        this.registerFactory(BlockEntity.CHEST, BlockEntityFactory.VOID_FACTORY);
+        this.registerFactory(BlockEntity.MOB_SPAWNER, BlockEntityFactory.VOID_FACTORY);
     }
 
-    public void registerFactory(String identifier, BiFunction<CompoundTag, BaseFullChunk, CompoundTag> factory) {
+    public void registerFactory(String identifier, BlockEntityFactory factory) {
         if (this.factories.containsKey(identifier)) {
             throw new IllegalArgumentException("BlockEntity factory is already registered: " + identifier);
         }
@@ -62,12 +62,12 @@ public class BlockEntityLoader {
             return null;
         }
 
-        BiFunction<CompoundTag, BaseFullChunk, CompoundTag> factory = this.factories.get(identifier);
+        BlockEntityFactory factory = this.factories.get(identifier);
         if (factory == null) {
             return null;
         }
 
-        return factory.apply(nbt, chunk);
+        return factory.createServerNbt(nbt, chunk);
     }
 
     public BlockEntity spawnBlockEntity(BaseFullChunk chunk, CompoundTag nbt) {
@@ -106,10 +106,5 @@ public class BlockEntityLoader {
         }
 
         return blockEntities;
-    }
-
-    public CompoundTag onChestBlockEntity(CompoundTag networkNbt, BaseFullChunk chunk) {
-        // TODO: verify items nbt
-        return networkNbt;
     }
 }
