@@ -28,6 +28,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 
+import java.util.List;
+
 public class NukkitLegacyBlockPalette implements BlockPaletteLegacy {
 
     private final Object2IntMap<NbtMap> state2RuntimeMap = new Object2IntOpenHashMap<>();

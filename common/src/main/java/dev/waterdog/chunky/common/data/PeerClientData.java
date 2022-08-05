@@ -36,6 +36,7 @@ public class PeerClientData {
     private int chunkRadius = 8;
     private long entityId;
     private Vector3f position;
+    private int dimension;
     private boolean chunkCache = false;
     private NbtList<NbtMap> blockPalette;
     private AuthoritativeMovementMode movementMode = AuthoritativeMovementMode.CLIENT;
@@ -64,13 +65,16 @@ public class PeerClientData {
             packet.setTick(0);
             session.sendPacket(packet);
         } else {
+            Vector2f motion = this.position == null ? Vector2f.ZERO : Vector2f.from(this.position.getX() - position.getX(), this.position.getZ() - position.getZ());
+            Vector3f delta = this.position == null ? Vector3f.ZERO : this.position.sub(position);
+
             PlayerAuthInputPacket packet = new PlayerAuthInputPacket();
             packet.setPosition(position);
             packet.setRotation(Vector3f.ZERO);
-            packet.setMotion(Vector2f.from(this.position.getX() - position.getX(), this.position.getZ() - position.getZ()));
+            packet.setMotion(motion);
             packet.setInputMode(InputMode.MOTION_CONTROLLER);
             packet.setPlayMode(ClientPlayMode.NORMAL);
-            packet.setDelta(this.position.sub(position));
+            packet.setDelta(delta);
             packet.setTick(0); // TODO:
             session.sendPacket(packet);
         }

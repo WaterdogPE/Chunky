@@ -18,24 +18,31 @@ package dev.waterdog.chunky.common.network;
 import com.nimbusds.jwt.SignedJWT;
 import com.nukkitx.math.vector.Vector2i;
 import com.nukkitx.math.vector.Vector3f;
+import com.nukkitx.math.vector.Vector3i;
 import com.nukkitx.network.util.DisconnectReason;
 import com.nukkitx.protocol.bedrock.BedrockClient;
 import com.nukkitx.protocol.bedrock.BedrockClientSession;
+import com.nukkitx.protocol.bedrock.data.SubChunkData;
+import com.nukkitx.protocol.bedrock.data.SubChunkRequestResult;
 import com.nukkitx.protocol.bedrock.handler.BedrockPacketHandler;
 import com.nukkitx.protocol.bedrock.packet.*;
 import com.nukkitx.protocol.bedrock.util.EncryptionUtils;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
+import dev.waterdog.chunky.common.data.chunk.ChunkyBlockStorage;
+import dev.waterdog.chunky.common.data.chunk.SubChunkHolder;
 import dev.waterdog.chunky.common.data.login.LoginData;
 import dev.waterdog.chunky.common.data.login.LoginState;
 import dev.waterdog.chunky.common.data.PeerClientData;
 import dev.waterdog.chunky.common.palette.BlockPaletteLegacy;
 import dev.waterdog.chunky.common.palette.VanillaBlockStates;
+import dev.waterdog.chunky.common.serializer.ChunkSerializer;
 import dev.waterdog.chunky.common.serializer.Serializers;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.ScheduledFuture;
 import it.unimi.dsi.fastutil.longs.*;
+import it.unimi.dsi.fastutil.objects.ObjectArraySet;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -72,8 +79,9 @@ public class ChunkyPeer implements BedrockPacketHandler {
 
     private ScheduledFuture<?> tickFuture;
 
-    private final List<Long> chunkRequests = new CopyOnWriteArrayList<>(); // LongLists.synchronize(new LongArrayList());
+    private final List<Long> chunkRequests = new CopyOnWriteArrayList<>();
     private final LongSet pendingChunks = LongSets.synchronize(new LongArraySet());
+    private final Long2ObjectMap<ChunkHolder> pendingSubChunks = Long2ObjectMaps.synchronize(new Long2ObjectArrayMap<>());
     private long lastRequest;
 
     public ChunkyPeer(ChunkyClient parent, MinecraftVersion version, InetSocketAddress targetAddress, EventLoop eventLoop) {
@@ -163,11 +171,17 @@ public class ChunkyPeer implements BedrockPacketHandler {
         }
 
         long currTime = System.currentTimeMillis();
-        if (currTime > this.lastRequest + (1000 * 2)) {
+        if (currTime > this.lastRequest + (1000 * 10)) {
             LongIterator iterator = this.pendingChunks.iterator();
             while (iterator.hasNext()) {
                 this.parent.onPendingChunkTimeout(iterator.nextLong(), this);
                 iterator.remove();
+            }
+
+            LongIterator subChunksIterator = this.pendingSubChunks.keySet().iterator();
+            while (subChunksIterator.hasNext()) {
+                this.parent.onPendingChunkTimeout(subChunksIterator.nextLong(), this);
+                subChunksIterator.remove();
             }
         }
 
@@ -190,6 +204,7 @@ public class ChunkyPeer implements BedrockPacketHandler {
         if (log.isDebugEnabled()) {
             log.debug("[{}] Requesting chunk x={} z={}", this.getDisplayName(), chunkX, chunkZ);
         }
+
         // Calculate all chunks that server will send us
         // Firstly we need all chunks from new position
         int radius = Math.max(1, this.getChunkRadius() - 1);
@@ -199,7 +214,6 @@ public class ChunkyPeer implements BedrockPacketHandler {
         checkChunksInRadius(this.getChunkX(), this.getChunkZ(), radius, newChunks::remove);
         this.pendingChunks.addAll(newChunks);
         this.chunkRequests.removeAll(newChunks);
-
         // Change position
         this.clientData.updateAndSendPosition(Vector3f.from((chunkX << 4) + 10, 255, (chunkZ << 4) + 10), this.session);
         this.lastRequest = System.currentTimeMillis();
@@ -207,6 +221,42 @@ public class ChunkyPeer implements BedrockPacketHandler {
 
     protected void offerChunkRequestUnsafe(long index) {
         this.chunkRequests.add(index);
+    }
+
+    private void requestSubChunksInternal(long index, ChunkHolder holder, int requestsLimit) {
+        int minY = this.clientData.getDimension() == 0 ? -4 : 0;
+        int maxY = this.clientData.getDimension() == 0 ? 20 : 16;
+        Vector3i centerPos = Vector3i.from(holder.getChunkX(), minY, holder.getChunkZ());
+
+        int requests = 0;
+        SubChunkRequestPacket packet = null;
+        Set<SubChunkRequestPacket> packets = new ObjectArraySet<>();
+
+        for (int y = minY; y < maxY; y++, requests++) {
+            if (packet == null || requests >= requestsLimit) {
+                if (packet != null && !packet.getPositionOffsets().isEmpty()) {
+                    packets.add(packet);
+                }
+                packet = new SubChunkRequestPacket();
+                packet.setDimension(this.clientData.getDimension());
+                packet.setSubChunkPosition(centerPos);
+                requests = 0;
+            }
+
+            Vector3i offset = Vector3i.from(0, y - centerPos.getY(), 0);
+            packet.getPositionOffsets().add(offset);
+            if (log.isDebugEnabled()) {
+                log.debug("Chunk x={} z={} requesting offset: [{}]", holder.getChunkX(), holder.getChunkZ(), offset);
+            }
+        }
+
+        if (!packet.getPositionOffsets().isEmpty()) {
+            packets.add(packet);
+        }
+
+        this.pendingSubChunks.put(index, holder);
+
+        packets.forEach(this.session::sendPacket);
     }
 
     protected void offerChunkUnsafe(long index) {
@@ -311,6 +361,7 @@ public class ChunkyPeer implements BedrockPacketHandler {
     public final boolean handle(StartGamePacket packet) {
         this.clientData.setEntityId(packet.getRuntimeEntityId());
         this.clientData.setBlockPalette(packet.getBlockPalette());
+        this.clientData.setDimension(packet.getDimensionId());
         if (packet.getPlayerMovementSettings() != null) {
             this.clientData.setMovementMode(packet.getPlayerMovementSettings().getMovementMode());
         }
@@ -357,21 +408,90 @@ public class ChunkyPeer implements BedrockPacketHandler {
             log.debug("[{}] Chunk: x={} z={}", this.getDisplayName(), packet.getChunkX(), packet.getChunkZ());
         }
 
-        ByteBuf buffer = Unpooled.wrappedBuffer(packet.getData());
-        ChunkHolder chunkHolder = new ChunkHolder(packet.getChunkX(), packet.getChunkZ(), packet.getSubChunksLength(), this.blockPalette);
-        Serializers.deserializeChunk(buffer, chunkHolder, this.blockPalette, this.loginData.getVersion().getProtocol());
-
         long chunkIndex = chunkIndex(packet.getChunkX(), packet.getChunkZ());
         if (!this.pendingChunks.remove(chunkIndex) && log.isDebugEnabled()) {
             log.debug("[{}] Not requested chunk: x={} z={}", this.getDisplayName(), packet.getChunkX(), packet.getChunkZ());
         }
-        this.parent.onChunkDeserializedCallback(chunkHolder, this);
+
+        int subChunksCount = packet.isRequestSubChunks() ?
+                (this.clientData.getDimension() == 0 ? 24 : 16) :
+                packet.getSubChunksLength();
+        ChunkHolder chunkHolder = new ChunkHolder(packet.getChunkX(), packet.getChunkZ(), subChunksCount, this.blockPalette);
+
+        ByteBuf buffer = Unpooled.wrappedBuffer(packet.getData());
+        if (packet.isRequestSubChunks()) {
+            chunkHolder.setSubChunks(new SubChunkHolder[subChunksCount]);
+
+            ChunkSerializer serializer = Serializers.getChunkSerializer(this.parent.getMinecraftVersion().getProtocol());
+            serializer.readLevelData(buffer, chunkHolder);
+            this.requestSubChunksInternal(chunkIndex, chunkHolder, packet.getSubChunkLimit());
+        } else {
+            Serializers.deserializeChunk(buffer, chunkHolder, this.blockPalette, this.loginData.getVersion().getProtocol());
+            this.parent.onChunkDeserializedCallback(chunkHolder, this);
+        }
         return true;
     }
 
     @Override
     public boolean handle(BlockEntityDataPacket packet) {
-        this.parent.getListener().onBlockEntityUpdate(packet.getBlockPosition(), packet.getData());
+        if (this.parent.getListener() != null) {
+            this.parent.getListener().onBlockEntityUpdate(packet.getBlockPosition(), packet.getData());
+        }
         return true;
+    }
+
+    @Override
+    public boolean handle(SubChunkPacket packet) {
+        for (SubChunkData subChunk : packet.getSubChunks()) {
+            this.handleSubChunkReceived(subChunk, packet.getCenterPosition());
+        }
+        return true;
+    }
+
+    private void handleSubChunkReceived(SubChunkData subChunkData, Vector3i centerPos) {
+        int chunkX = centerPos.getX() + subChunkData.getPosition().getX();
+        int chunkZ = centerPos.getZ() + subChunkData.getPosition().getZ();
+        int subChunkY = centerPos.getY() + subChunkData.getPosition().getY();
+        long chunkIndex = chunkIndex(chunkX, chunkZ);
+
+        SubChunkRequestResult result = subChunkData.getResult();
+        if (result != SubChunkRequestResult.SUCCESS && result != SubChunkRequestResult.SUCCESS_ALL_AIR) {
+            log.debug("CenterPos x={} z={} y={} subChunk [{}] with result {}", centerPos.getX(), centerPos.getZ(), centerPos.getY(), subChunkData.getPosition(), result);
+            return;
+        }
+
+        ChunkHolder chunkHolder = this.pendingSubChunks.get(chunkIndex);
+        if (chunkHolder == null) {
+            log.debug("[{}] Not requested chunk: x={} z={} y={} ", this.getDisplayName(), chunkX, chunkZ, subChunkY);
+            return;
+        }
+
+        int offsetY = this.clientData.getDimension() == 0 ? 4 : 0;
+        int realSubChunkY = subChunkY + offsetY;
+        if (realSubChunkY >= chunkHolder.getSubChunks().length) {
+            log.warn("CenterPos x={} z={} subChunk [{}] has {} subChunks, received response for {}", centerPos.getX(), centerPos.getY(), subChunkData.getPosition(),
+                    chunkHolder.getSubChunks().length, realSubChunkY);
+            return;
+        }
+
+        SubChunkHolder holder;
+        if (result == SubChunkRequestResult.SUCCESS_ALL_AIR) {
+            holder = SubChunkHolder.emptyHolder(subChunkY);
+        } else {
+            ByteBuf buffer = Unpooled.wrappedBuffer(subChunkData.getData());
+            int subChunkVersion = buffer.readUnsignedByte();
+            ChunkyBlockStorage[] storages = Serializers.deserializeSubChunk(buffer, chunkHolder, blockPalette, subChunkVersion);
+            holder = new SubChunkHolder(subChunkY, storages);
+
+            if (buffer.readableBytes() > 0) {
+                chunkHolder.addBlockEntities(buffer);
+            }
+        }
+        chunkHolder.getSubChunks()[realSubChunkY] = holder;
+
+        if (chunkHolder.hasAllSubChunks()) {
+            this.pendingSubChunks.remove(chunkIndex);
+            this.parent.onChunkDeserializedCallback(chunkHolder, this);
+        }
     }
 }

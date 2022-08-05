@@ -92,6 +92,11 @@ public class VanillaBlockStates {
                 return MinecraftVersion.MINECRAFT_PE_1_18_0.getProtocol();
             case MINECRAFT_PE_1_18_10:
                 return MinecraftVersion.MINECRAFT_PE_1_18_10.getProtocol();
+            case MINECRAFT_PE_1_18_30:
+                return MinecraftVersion.MINECRAFT_PE_1_18_30.getProtocol();
+            case MINECRAFT_PE_1_19_0:
+            case MINECRAFT_PE_1_19_10:
+                return MinecraftVersion.MINECRAFT_PE_1_19_0.getProtocol();
             case MINECRAFT_PE_1_13:
             case MINECRAFT_PE_1_14_30:
             case MINECRAFT_PE_1_14_60:

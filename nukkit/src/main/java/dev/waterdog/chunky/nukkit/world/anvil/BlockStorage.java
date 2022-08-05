@@ -15,18 +15,17 @@
 
 package dev.waterdog.chunky.nukkit.world.anvil;
 
-import cn.nukkit.level.format.anvil.util.BlockStorage;
 import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
 import it.unimi.dsi.fastutil.ints.IntList;
 
-public class PalettedBlockStorage {
+public class BlockStorage {
 
     public static final int SIZE = 4096;
     private final IntList palette;
     private BitArray bitArray;
 
-    public PalettedBlockStorage(BitArray bitArray, IntList palette) {
+    public BlockStorage(BitArray bitArray, IntList palette) {
         this.palette = palette;
         this.bitArray = bitArray;
     }

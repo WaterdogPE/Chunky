@@ -38,10 +38,12 @@ public class ChunkSerializer338 implements ChunkSerializer {
         }
         chunkHolder.setSubChunks(subChunks);
 
-        // TODO: we don't support 3D biomes so far
-        byte[] biomeData = new byte[256];
-        buffer.readBytes(biomeData);
-        chunkHolder.setBiomeData(biomeData);
+        this.readLevelData(buffer, chunkHolder);
+    }
+
+    @Override
+    public void readLevelData(ByteBuf buffer, ChunkHolder chunkHolder) {
+        this.readBiomeData(buffer, chunkHolder);
 
         short borderBlocksSize = buffer.readUnsignedByte();
         buffer.skipBytes(borderBlocksSize); // 1 byte per borderBlock
@@ -49,5 +51,12 @@ public class ChunkSerializer338 implements ChunkSerializer {
         byte[] blockEntities = new byte[buffer.readableBytes()];
         buffer.readBytes(blockEntities);
         chunkHolder.setBlockEntities(blockEntities);
+    }
+
+    @Override
+    public void readBiomeData(ByteBuf buffer, ChunkHolder chunkHolder) {
+        byte[] biomeData = new byte[256];
+        buffer.readBytes(biomeData);
+        chunkHolder.setBiomeData(biomeData);
     }
 }

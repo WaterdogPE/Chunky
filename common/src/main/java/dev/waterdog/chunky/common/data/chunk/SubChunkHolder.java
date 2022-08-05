@@ -21,4 +21,8 @@ import lombok.Data;
 public class SubChunkHolder {
     private final int y;
     private final ChunkyBlockStorage[] storages;
+
+    public static SubChunkHolder emptyHolder(int y) {
+        return new SubChunkHolder(y, new ChunkyBlockStorage[]{ChunkyBlockStorage.AIR_STORAGE, ChunkyBlockStorage.AIR_STORAGE});
+    }
 }

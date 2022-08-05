@@ -167,7 +167,7 @@ public class ChunkyClient {
         if (request == null) {
             return;
         }
-        log.info("[{}] pending chunk timeout: {}", peer.getDisplayName(), index);
+        log.info("[{}] pending chunk timeout: x={} z={}", peer.getDisplayName(), chunkX(index), chunkZ(index));
 
         if (this.listener != null) {
             this.listener.onChunkRequestTimeout(request, peer);

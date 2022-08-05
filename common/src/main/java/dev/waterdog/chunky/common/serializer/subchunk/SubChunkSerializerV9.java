@@ -13,17 +13,20 @@
  * limitations under the License.
  */
 
-package dev.waterdog.chunky.common.serializer;
+package dev.waterdog.chunky.common.serializer.subchunk;
 
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
+import dev.waterdog.chunky.common.data.chunk.ChunkyBlockStorage;
 import dev.waterdog.chunky.common.palette.BlockPalette;
 import io.netty.buffer.ByteBuf;
 
-public interface ChunkSerializer {
+public class SubChunkSerializerV9 extends SubChunkSerializerV8 {
+    public static final SubChunkSerializerV9 INSTANCE = new SubChunkSerializerV9();
 
-    void deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette);
-
-    void readLevelData(ByteBuf buffer, ChunkHolder chunkHolder);
-
-    void readBiomeData(ByteBuf buffer, ChunkHolder chunkHolder);
+    @Override
+    public ChunkyBlockStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette) {
+        int storagesCount = buffer.readUnsignedByte();
+        buffer.readUnsignedByte(); // sectionY
+        return this.deserialize(buffer, storagesCount, chunkHolder, blockPalette);
+    }
 }

@@ -15,45 +15,58 @@
 
 package dev.waterdog.chunky.common;
 
+import dev.waterdog.chunky.common.data.ChunkRequest;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.network.ChunkyClient;
+import dev.waterdog.chunky.common.network.ChunkyPeer;
 import dev.waterdog.chunky.common.network.MinecraftVersion;
 import dev.waterdog.chunky.common.palette.DefaultBlockPaletteFactory;
+import dev.waterdog.chunky.common.palette.VanillaBlockStates;
 import dev.waterdog.chunky.common.util.ChunkUtils;
 import it.unimi.dsi.fastutil.longs.LongArraySet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import lombok.extern.log4j.Log4j2;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.LongConsumer;
 
 @Log4j2
 public class SimpleChunkyTest {
 
-    private static final MinecraftVersion VERSION = MinecraftVersion.MINECRAFT_PE_1_13;
-    public static final InetSocketAddress ADDRESS = new InetSocketAddress("192.168.0.50", 19132);
+    private static final MinecraftVersion VERSION = MinecraftVersion.MINECRAFT_PE_1_18_30;
+    public static final InetSocketAddress ADDRESS = new InetSocketAddress("127.0.0.1", 19132);
     private static volatile boolean running = true;
+
+    private static AtomicInteger receivedCount = new AtomicInteger();
 
     private static final BiConsumer<ChunkHolder, Throwable> HANDLER = (holder, error) -> {
         if (error != null) {
             log.error("Failed to request chunk", error);
+        } else {
+            receivedCount.incrementAndGet();
         }
     };
+
+    private static final ChunkyListener LISTENER = new ChunkyListener() {};
 
     public static void main(String[] args) throws Exception {
         new SimpleChunkyTest();
     }
 
     public SimpleChunkyTest() throws Exception {
+        VanillaBlockStates.get().getOrCreatePalette(VERSION, DefaultBlockPaletteFactory.INSTANCE);
+
         ChunkyClient chunkyClient = ChunkyClient.builder()
-                .peerCount(1)
+                .peerCount(4)
                 .minecraftVersion(VERSION)
                 .targetAddress(ADDRESS)
                 .paletteFactory(DefaultBlockPaletteFactory.INSTANCE)
                 .maxPendingRequests(0)
                 .autoReconnect(true)
                 .reconnectInterval(8)
+                .listener(LISTENER)
                 .build();
         chunkyClient.connect().join();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> shutdownHook(chunkyClient)));
@@ -82,6 +95,7 @@ public class SimpleChunkyTest {
 
     private static void shutdownHook(ChunkyClient chunky) {
         log.warn("Pending chunks: " + chunky.getPendingChunkRequests().size());
+        log.warn("Received chunks: " + receivedCount.get());
         chunky.getPendingChunkRequests().values().forEach(request ->
                 log.info("pending chunk x={} z={}", request.getChunkX(), request.getChunkZ()));
         running = false;

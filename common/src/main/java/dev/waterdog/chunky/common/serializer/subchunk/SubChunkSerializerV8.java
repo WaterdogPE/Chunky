@@ -18,14 +18,13 @@ package dev.waterdog.chunky.common.serializer.subchunk;
 import com.nukkitx.nbt.NBTInputStream;
 import com.nukkitx.nbt.NbtMap;
 import com.nukkitx.nbt.NbtUtils;
-import com.nukkitx.network.VarInts;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.data.chunk.ChunkyBlockStorage;
 import dev.waterdog.chunky.common.palette.BlockPalette;
+import dev.waterdog.chunky.common.serializer.PaletteStorageSerializer;
 import dev.waterdog.chunky.common.serializer.SubChunkSerializer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 import java.io.IOException;
 import java.util.List;
@@ -36,30 +35,16 @@ public class SubChunkSerializerV8 implements SubChunkSerializer {
     @Override
     public ChunkyBlockStorage[] deserialize(ByteBuf buffer, ChunkHolder chunkHolder, BlockPalette blockPalette) {
         int storagesCount = buffer.readUnsignedByte();
+        return this.deserialize(buffer, storagesCount, chunkHolder, blockPalette);
+    }
+
+    protected ChunkyBlockStorage[] deserialize(ByteBuf buffer, int storagesCount, ChunkHolder chunkHolder, BlockPalette blockPalette) {
         ChunkyBlockStorage[] storages = new ChunkyBlockStorage[storagesCount];
 
         for (int y = 0; y < storagesCount; y++) {
             ChunkyBlockStorage storage = new ChunkyBlockStorage();
             storage.setLegacy(false);
-            storage.setPaletteHeader(buffer.readUnsignedByte());
-            // storage is 16 * 16 * 16 large
-            int blocksPerWord = Integer.SIZE / storage.getBitsPerBlock();
-            int wordsCount = (4096 + blocksPerWord - 1) / blocksPerWord;
-            if (storage.isPersistent()) {
-                throw new IllegalStateException("SubChunk version 8 does not support persistent storages over network!");
-            }
-
-            int[] words = new int[wordsCount];
-            for (int i = 0; i < wordsCount; i++) {
-               words[i] = buffer.readIntLE();
-            }
-            storage.setWords(words);
-
-            int paletteSize = VarInts.readInt(buffer);
-            storage.setPalette(new IntArrayList());
-            for (int i = 0; i < paletteSize; i++) {
-                storage.getPalette().add(VarInts.readInt(buffer));
-            }
+            PaletteStorageSerializer.deserializePalette(buffer, storage);
             storages[y] = storage;
         }
         return storages;

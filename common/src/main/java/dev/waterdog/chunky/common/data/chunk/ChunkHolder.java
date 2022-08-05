@@ -16,6 +16,7 @@
 package dev.waterdog.chunky.common.data.chunk;
 
 import dev.waterdog.chunky.common.palette.BlockPaletteLegacy;
+import io.netty.buffer.ByteBuf;
 import lombok.Data;
 
 @Data
@@ -27,5 +28,26 @@ public class ChunkHolder {
 
     private SubChunkHolder[] subChunks;
     private byte[] biomeData;
+    private PaletteHolder[] palettedBiomes;
     private byte[] blockEntities;
+
+    public boolean hasAllSubChunks() {
+        for (SubChunkHolder subChunk : this.subChunks) {
+            if (subChunk == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public void addBlockEntities(ByteBuf buffer) {
+        int size = this.blockEntities == null ? 0 : this.blockEntities.length;
+        byte[] blockEntities = new byte[size + buffer.readableBytes()];
+
+        if (size > 0) {
+            System.arraycopy(this.blockEntities, 0, blockEntities, 0, size);
+        }
+        buffer.readBytes(blockEntities, size, buffer.readableBytes());
+        this.blockEntities = blockEntities;
+    }
 }

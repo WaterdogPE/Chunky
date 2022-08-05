@@ -42,8 +42,3 @@ dependency-reduced-pom.xml
 buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
-
-# WaterdogPE test files
-config.yml
-lang.ini
-plugins/

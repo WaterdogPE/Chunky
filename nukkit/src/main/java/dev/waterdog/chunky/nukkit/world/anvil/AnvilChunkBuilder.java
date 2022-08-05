@@ -18,7 +18,6 @@ package dev.waterdog.chunky.nukkit.world.anvil;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.format.anvil.Chunk;
 import cn.nukkit.level.format.anvil.ChunkSection;
-import cn.nukkit.level.format.anvil.util.BlockStorage;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.util.BitArray;
@@ -28,8 +27,12 @@ import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.data.chunk.SubChunkHolder;
 import dev.waterdog.chunky.common.palette.BlockPaletteLegacy;
 import dev.waterdog.chunky.nukkit.world.ChunkBuilder;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class AnvilChunkBuilder implements ChunkBuilder {
+    private static final Logger log = LogManager.getLogger("Chunky");
+
     public static final AnvilChunkBuilder INSTANCE = new AnvilChunkBuilder();
 
     @Override
@@ -44,13 +47,15 @@ public class AnvilChunkBuilder implements ChunkBuilder {
             }
 
             ChunkyBlockStorage storage = subChunkHolder.getStorages()[0];
-            BlockStorage anvilStorage;
-            if (storage.isLegacy()) {
-                anvilStorage = new BlockStorage(storage.getBlockIds(), new NibbleArray(storage.getBlockData()));
+            cn.nukkit.level.format.anvil.util.BlockStorage anvilStorage;
+            if (storage.isEmpty()) {
+                anvilStorage = new cn.nukkit.level.format.anvil.util.BlockStorage();
+            } else if (storage.isLegacy()) {
+                anvilStorage = new cn.nukkit.level.format.anvil.util.BlockStorage(storage.getBlockIds(), new NibbleArray(storage.getBlockData()));
             } else {
                 BitArrayVersion version = BitArrayVersion.get(storage.getBitsPerBlock(), true);
-                BitArray bitArray = version.createPalette(PalettedBlockStorage.SIZE, storage.getWords());
-                PalettedBlockStorage palettedStorage = new PalettedBlockStorage(bitArray, storage.getPalette());
+                BitArray bitArray = version.createPalette(BlockStorage.SIZE, storage.getWords());
+                BlockStorage palettedStorage = new BlockStorage(bitArray, storage.getPalette());
                 anvilStorage = this.convertStorages(palettedStorage, blockPalette);
             }
 
@@ -58,12 +63,16 @@ public class AnvilChunkBuilder implements ChunkBuilder {
             ((Chunk) chunk).setSection(subChunkHolder.getY(), section);
         }
 
-        chunk.setBiomeIdArray(chunkHolder.getBiomeData());
+        if (chunkHolder.getBlockPalette() == null) {
+            chunk.setBiomeIdArray(chunkHolder.getBiomeData());
+        } else {
+            log.debug("Chunk x={} z={} has paletted biomes, but Anvil does not support it!", chunkHolder.getChunkX(), chunkHolder.getChunkZ());
+        }
         return chunk;
     }
 
-    private BlockStorage convertStorages(PalettedBlockStorage palletedStorage, BlockPaletteLegacy blockPalette) {
-        BlockStorage storage = new BlockStorage();
+    private cn.nukkit.level.format.anvil.util.BlockStorage convertStorages(BlockStorage palletedStorage, BlockPaletteLegacy blockPalette) {
+        cn.nukkit.level.format.anvil.util.BlockStorage storage = new cn.nukkit.level.format.anvil.util.BlockStorage();
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 for (int y = 0; y < 16; y++) {

@@ -1,0 +1,15 @@
+# Configuration for Chunky
+
+# Client Settings
+## Count of peers - clients that will join target server
+peer_count: 4
+## Target server version
+codec_version: "1.16.200.5"
+## Max pending chunks count per peer
+## set to 0 for unlimited
+max_pending_requests: 80
+## Target server address
+target_address: "0.0.0.0:19133"
+# World settings
+## Name of the world which should be using Chunky
+world_name: "world"
