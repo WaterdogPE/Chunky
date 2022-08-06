@@ -33,9 +33,12 @@ import com.nukkitx.nbt.NbtUtils;
 import dev.waterdog.chunky.common.ChunkyListener;
 import dev.waterdog.chunky.common.data.ChunkRequest;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
+import dev.waterdog.chunky.common.data.chunk.SubChunkHolder;
 import dev.waterdog.chunky.common.network.ChunkyClient;
 import dev.waterdog.chunky.common.network.ChunkyPeer;
+import dev.waterdog.chunky.common.util.ChunkUtils;
 import dev.waterdog.chunky.nukkit.world.anvil.AnvilChunkBuilder;
+import io.netty.util.internal.PlatformDependent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -43,6 +46,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.List;
+import java.util.Queue;
 
 
 public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
@@ -51,9 +55,18 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
     private final ChunkyClient chunky;
     private final Level level;
 
-    public ChunkyManager(ChunkyClient chunkyClient, Level level) {
+    private final ChunkyWorldUpdater worldUpdater;
+    private final Queue<Long> chunkUpdateRequests = PlatformDependent.newMpscQueue();
+
+    public ChunkyManager(ChunkyClient chunkyClient, Level level, boolean worldUpdates) {
         this.chunky = chunkyClient;
         this.level = level;
+        if (worldUpdates) {
+            this.worldUpdater = new ChunkyWorldUpdater(this);
+            level.getServer().getScheduler().scheduleRepeatingTask(this::tickChunkUpdates, 20, true);
+        } else {
+            this.worldUpdater = null;
+        }
     }
 
     public void requestChunk(BaseFullChunk chunk) {
@@ -74,6 +87,33 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
         }
     }
 
+    public void requestChunkUpdate(int chunkX, int chunkZ) {
+        long index = ChunkUtils.chunkIndex(chunkX, chunkZ);
+        if (!this.chunkUpdateRequests.contains(index)) {
+            this.chunkUpdateRequests.offer(index);
+        }
+    }
+
+    private void requestChunkUpdateInternal(int chunkX, int chunkZ) {
+        log.info("Requesting chunk update x={} z={}", chunkX, chunkZ);
+        this.chunky.requestChunk(chunkX, chunkZ).whenComplete(((chunkHolder, error) -> {
+            if (error != null) {
+                log.error("Failed to update chunk", error);
+            } else {
+                this.onChunkUpdateReceived(chunkHolder);
+            }
+        }));
+    }
+
+    public void tickChunkUpdates() {
+        int requests = 0;
+        while (!this.chunkUpdateRequests.isEmpty() && requests < 10) {
+            long index = this.chunkUpdateRequests.poll();
+            this.requestChunkUpdateInternal(ChunkUtils.chunkX(index), ChunkUtils.chunkZ(index));
+            requests++;
+        }
+    }
+
     @Override
     public void onUnhandledChunkReceived(ChunkHolder chunkHolder, ChunkyPeer peer) {
         this.getScheduler().scheduleTask(() -> {
@@ -87,15 +127,12 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
     private void onChunkReceived(ChunkHolder chunkHolder, BaseFullChunk baseChunk) {
         log.info("Received chunk x={} z={}", chunkHolder.getChunkX(), chunkHolder.getChunkZ());
 
-        LevelProvider provider = this.level.getProvider();
-        BaseFullChunk chunk;
-        if (provider instanceof Anvil) {
-            chunk = AnvilChunkBuilder.INSTANCE.buildChunk(baseChunk, chunkHolder, chunkHolder.getBlockPalette());
-        } else {
-            log.warn("[Chunky] Unsupported provider {}", provider.getClass().getSimpleName());
+        ChunkBuilder chunkBuilder = this.getChunkBuilder();
+        if (chunkBuilder == null) {
             return;
         }
 
+        BaseFullChunk chunk = chunkBuilder.buildChunk(baseChunk, chunkHolder, chunkHolder.getBlockPalette());;
         chunk.setGenerated();
         chunk.setPopulated();
 
@@ -109,6 +146,27 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
                 }
             }
         });
+    }
+
+    private void onChunkUpdateReceived(ChunkHolder chunkHolder) {
+        log.info("Received chunk update x={} z={}", chunkHolder.getChunkX(), chunkHolder.getChunkZ());
+
+        BaseFullChunk chunk = this.level.getChunk(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), false);
+        if (chunk == null) {
+            return;
+        }
+
+        ChunkBuilder chunkBuilder = this.getChunkBuilder();
+        if (chunkBuilder == null) {
+            return;
+        }
+
+        for (SubChunkHolder subChunk : chunkHolder.getSubChunks()) {
+            if (subChunk.getY() <= 0) {
+                chunkBuilder.buildChunkSection(chunk, subChunk, chunkHolder.getBlockPalette());
+            }
+        }
+        this.level.setChunk(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), chunk, false);
     }
 
     @Override
@@ -171,5 +229,19 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
             stream.close();
         }
         return NBTIO.read(stream.toByteArray(), ByteOrder.BIG_ENDIAN, false);
+    }
+
+    public ChunkBuilder getChunkBuilder() {
+        LevelProvider provider = this.level.getProvider();
+        if (provider instanceof Anvil) {
+            return AnvilChunkBuilder.INSTANCE;
+        } else {
+            log.warn("[Chunky] Unsupported provider {}", provider.getClass().getSimpleName());
+        }
+        return null;
+    }
+
+    public Level getLevel() {
+        return this.level;
     }
 }

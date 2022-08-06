@@ -13,3 +13,5 @@ target_address: "0.0.0.0:19133"
 # World settings
 ## Name of the world which should be using Chunky
 world_name: "world"
+## Whether update chunks if they were already generated
+perform_world_updates: false

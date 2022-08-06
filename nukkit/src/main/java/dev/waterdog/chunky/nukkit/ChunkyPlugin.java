@@ -61,8 +61,10 @@ public class ChunkyPlugin extends PluginBase implements Listener {
             return;
         }
 
+        boolean worldUpdates = this.getConfig().getBoolean("perform_world_updates");
+
         ChunkyClient client = this.buildClient();
-        ChunkyManager chunkyManager = new ChunkyManager(client, level);
+        ChunkyManager chunkyManager = new ChunkyManager(client, level, worldUpdates);
         client.setListener(chunkyManager);
         level.setGeneratorTaskFactory(chunkyManager);
         client.connect().whenComplete((v, error) -> {

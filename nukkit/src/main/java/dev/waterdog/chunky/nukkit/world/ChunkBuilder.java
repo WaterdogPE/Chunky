@@ -17,9 +17,12 @@ package dev.waterdog.chunky.nukkit.world;
 
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
+import dev.waterdog.chunky.common.data.chunk.SubChunkHolder;
 import dev.waterdog.chunky.common.palette.BlockPaletteLegacy;
 
 public interface ChunkBuilder {
 
     BaseFullChunk buildChunk(BaseFullChunk chunk, ChunkHolder chunkHolder, BlockPaletteLegacy blockPalette);
+
+    void buildChunkSection(BaseFullChunk chunk, SubChunkHolder subChunkHolder, BlockPaletteLegacy blockPalette);
 }

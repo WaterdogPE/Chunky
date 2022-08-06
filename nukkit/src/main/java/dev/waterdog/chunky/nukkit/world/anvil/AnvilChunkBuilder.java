@@ -42,25 +42,7 @@ public class AnvilChunkBuilder implements ChunkBuilder {
         }
 
         for (SubChunkHolder subChunkHolder : chunkHolder.getSubChunks()) {
-            if (subChunkHolder.getStorages().length < 1 || subChunkHolder.getStorages()[0] == null) {
-                throw new IllegalArgumentException("Chunk section has 0 block storages!");
-            }
-
-            ChunkyBlockStorage storage = subChunkHolder.getStorages()[0];
-            cn.nukkit.level.format.anvil.util.BlockStorage anvilStorage;
-            if (storage.isEmpty()) {
-                anvilStorage = new cn.nukkit.level.format.anvil.util.BlockStorage();
-            } else if (storage.isLegacy()) {
-                anvilStorage = new cn.nukkit.level.format.anvil.util.BlockStorage(storage.getBlockIds(), new NibbleArray(storage.getBlockData()));
-            } else {
-                BitArrayVersion version = BitArrayVersion.get(storage.getBitsPerBlock(), true);
-                BitArray bitArray = version.createPalette(BlockStorage.SIZE, storage.getWords());
-                BlockStorage palettedStorage = new BlockStorage(bitArray, storage.getPalette());
-                anvilStorage = this.convertStorages(palettedStorage, blockPalette);
-            }
-
-            ChunkSection section = new ChunkSection(subChunkHolder.getY(), anvilStorage, null, null, null, false, false);
-            ((Chunk) chunk).setSection(subChunkHolder.getY(), section);
+            this.buildChunkSection(chunk, subChunkHolder, blockPalette);
         }
 
         if (chunkHolder.getBlockPalette() == null) {
@@ -70,6 +52,30 @@ public class AnvilChunkBuilder implements ChunkBuilder {
         }
         return chunk;
     }
+
+    @Override
+    public void buildChunkSection(BaseFullChunk chunk, SubChunkHolder subChunkHolder, BlockPaletteLegacy blockPalette) {
+        if (subChunkHolder.getStorages().length < 1 || subChunkHolder.getStorages()[0] == null) {
+            throw new IllegalArgumentException("Chunk section has 0 block storages!");
+        }
+
+        ChunkyBlockStorage storage = subChunkHolder.getStorages()[0];
+        cn.nukkit.level.format.anvil.util.BlockStorage anvilStorage;
+        if (storage.isEmpty()) {
+            anvilStorage = new cn.nukkit.level.format.anvil.util.BlockStorage();
+        } else if (storage.isLegacy()) {
+            anvilStorage = new cn.nukkit.level.format.anvil.util.BlockStorage(storage.getBlockIds(), new NibbleArray(storage.getBlockData()));
+        } else {
+            BitArrayVersion version = BitArrayVersion.get(storage.getBitsPerBlock(), true);
+            BitArray bitArray = version.createPalette(BlockStorage.SIZE, storage.getWords());
+            BlockStorage palettedStorage = new BlockStorage(bitArray, storage.getPalette());
+            anvilStorage = this.convertStorages(palettedStorage, blockPalette);
+        }
+
+        ChunkSection section = new ChunkSection(subChunkHolder.getY(), anvilStorage, null, null, null, false, false);
+        ((Chunk) chunk).setSection(subChunkHolder.getY(), section);
+    }
+
 
     private cn.nukkit.level.format.anvil.util.BlockStorage convertStorages(BlockStorage palletedStorage, BlockPaletteLegacy blockPalette) {
         cn.nukkit.level.format.anvil.util.BlockStorage storage = new cn.nukkit.level.format.anvil.util.BlockStorage();
