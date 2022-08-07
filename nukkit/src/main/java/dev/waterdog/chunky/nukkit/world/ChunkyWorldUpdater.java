@@ -27,6 +27,7 @@ public class ChunkyWorldUpdater {
     private static final int NEGATIVE_SECTION = -4;
     private static final int MAX_REQUESTS_PER_TICK = 40;
     private static final int CHUNK_RADIUS = 2;
+    public static final int CHUNK_POST_UPDATE_RADIUS = 10;
 
     private final ChunkyManager loader;
 

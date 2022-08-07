@@ -39,19 +39,25 @@ import dev.waterdog.chunky.common.data.chunk.ChunkHolder;
 import dev.waterdog.chunky.common.data.chunk.SubChunkHolder;
 import dev.waterdog.chunky.common.network.ChunkyClient;
 import dev.waterdog.chunky.common.network.ChunkyPeer;
-import dev.waterdog.chunky.common.util.ChunkUtils;
 import dev.waterdog.chunky.nukkit.world.anvil.AnvilChunkBuilder;
 import io.netty.util.internal.PlatformDependent;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import net.jodah.expiringmap.ExpiringMap;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import static dev.waterdog.chunky.common.util.ChunkUtils.*;
+import static dev.waterdog.chunky.nukkit.world.ChunkyWorldUpdater.CHUNK_POST_UPDATE_RADIUS;
 
 
 public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
@@ -61,7 +67,10 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
     private final Level level;
 
     private final ChunkyWorldUpdater worldUpdater;
-    private final Queue<Long> chunkUpdateRequests = PlatformDependent.newMpscQueue();
+    private final Queue<Long> chunkUpdateRequests = PlatformDependent.newMpscQueue(100);
+    private final Set<Long> lastRequests = Collections.newSetFromMap(ExpiringMap.builder()
+            .expiration(120, TimeUnit.SECONDS)
+            .build());
 
     public ChunkyManager(ChunkyClient chunkyClient, Level level, boolean worldUpdates) {
         this.chunky = chunkyClient;
@@ -76,6 +85,7 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
 
     public void requestChunk(BaseFullChunk chunk) {
         log.info("Requesting chunk x={} z={}", chunk.getX(), chunk.getZ());
+        this.lastRequests.add(chunkIndex(chunk.getX(), chunk.getZ()));
         this.chunky.requestChunk(chunk.getX(), chunk.getZ()).whenComplete(((chunkHolder, error) -> {
             if (error != null) {
                 log.error("Failed to generate chunk", error);
@@ -93,7 +103,7 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
     }
 
     public void requestChunkUpdate(int chunkX, int chunkZ) {
-        long index = ChunkUtils.chunkIndex(chunkX, chunkZ);
+        long index = chunkIndex(chunkX, chunkZ);
         if (!this.chunkUpdateRequests.contains(index)) {
             this.chunkUpdateRequests.offer(index);
         }
@@ -114,7 +124,7 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
         int requests = 0;
         while (!this.chunkUpdateRequests.isEmpty() && requests < 10) {
             long index = this.chunkUpdateRequests.poll();
-            this.requestChunkUpdateInternal(ChunkUtils.chunkX(index), ChunkUtils.chunkZ(index));
+            this.requestChunkUpdateInternal(chunkX(index), chunkZ(index));
             requests++;
         }
     }
@@ -126,7 +136,7 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
            if (!baseChunk.isGenerated() || !baseChunk.isPopulated()) {
                this.getScheduler().scheduleTask(() -> this.onChunkReceived(chunkHolder, baseChunk), true);
            } else if (baseChunk.isGenerated() && this.worldUpdater != null && this.worldUpdater.canChunkUpdate((BaseChunk) baseChunk)) {
-               this.onChunkUpdateReceived(chunkHolder);
+               this.getScheduler().scheduleTask(() -> this.onChunkUpdateReceived(chunkHolder), true);
            }
         });
     }
@@ -166,9 +176,21 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
             return;
         }
 
+        boolean wasNeighbourGenerated = false;
+        for (int x = -CHUNK_POST_UPDATE_RADIUS; x < CHUNK_POST_UPDATE_RADIUS && !wasNeighbourGenerated; x++) {
+            for (int z = -CHUNK_POST_UPDATE_RADIUS; z < CHUNK_POST_UPDATE_RADIUS; z++) {
+                long index = chunkIndex(chunkHolder.getChunkX() + x, chunkHolder.getChunkZ() + z);
+                if (this.lastRequests.contains(index)) {
+                    wasNeighbourGenerated = true;
+                    log.info("Doing full chunk update at x={} z={}", chunkHolder.getChunkX(), chunkHolder.getChunkZ());
+                    break;
+                }
+            }
+        }
+
         Int2ObjectMap<ChunkSection> sections = new Int2ObjectOpenHashMap<>();
         for (SubChunkHolder subChunk : chunkHolder.getSubChunks()) {
-            if (subChunk.getY() <= 0) {
+            if (wasNeighbourGenerated || subChunk.getY() <= 0) {
                 ChunkSection section = chunkBuilder.buildChunkSection(subChunk, chunkHolder.getBlockPalette());
                 sections.put(subChunk.getY(), section);
             }
@@ -216,7 +238,7 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
 
     @Override
     public void onChunkRequestTimeout(ChunkRequest request, ChunkyPeer peer) {
-        log.warn("Chunk request x={} z={} timed out", request.getChunkX(), request.getChunkZ());
+        log.info("Chunk request x={} z={} timed out", request.getChunkX(), request.getChunkZ());
         if (!peer.canRequestChunks()) {
             // Peer was closed or is reconnecting
             this.getScheduler().scheduleDelayedTask(() -> this.requestChunkInternal(request.getChunkX(), request.getChunkZ()), 15);
