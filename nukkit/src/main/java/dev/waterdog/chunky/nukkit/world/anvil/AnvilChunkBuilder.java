@@ -42,7 +42,8 @@ public class AnvilChunkBuilder implements ChunkBuilder {
         }
 
         for (SubChunkHolder subChunkHolder : chunkHolder.getSubChunks()) {
-            this.buildChunkSection(chunk, subChunkHolder, blockPalette);
+            ChunkSection section = this.buildChunkSection(subChunkHolder, blockPalette);
+            ((Chunk) chunk).setSection(section.getY(), section);
         }
 
         if (chunkHolder.getBlockPalette() == null) {
@@ -54,7 +55,7 @@ public class AnvilChunkBuilder implements ChunkBuilder {
     }
 
     @Override
-    public void buildChunkSection(BaseFullChunk chunk, SubChunkHolder subChunkHolder, BlockPaletteLegacy blockPalette) {
+    public ChunkSection buildChunkSection(SubChunkHolder subChunkHolder, BlockPaletteLegacy blockPalette) {
         if (subChunkHolder.getStorages().length < 1 || subChunkHolder.getStorages()[0] == null) {
             throw new IllegalArgumentException("Chunk section has 0 block storages!");
         }
@@ -72,8 +73,7 @@ public class AnvilChunkBuilder implements ChunkBuilder {
             anvilStorage = this.convertStorages(palettedStorage, blockPalette);
         }
 
-        ChunkSection section = new ChunkSection(subChunkHolder.getY(), anvilStorage, null, null, null, false, false);
-        ((Chunk) chunk).setSection(subChunkHolder.getY(), section);
+        return new ChunkSection(subChunkHolder.getY(), anvilStorage, null, null, null, false, false);
     }
 
 

@@ -57,7 +57,7 @@ public class ChunkyWorldUpdater {
         }
     }
 
-    private boolean canChunkUpdate(BaseChunk chunk) {
+    public boolean canChunkUpdate(BaseChunk chunk) {
         ChunkSection section = chunk.getSection(NEGATIVE_SECTION);
         if (section.isEmpty()) {
             return true;

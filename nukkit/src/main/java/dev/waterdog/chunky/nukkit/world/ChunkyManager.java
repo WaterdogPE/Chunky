@@ -17,10 +17,13 @@ package dev.waterdog.chunky.nukkit.world;
 
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.anvil.Anvil;
+import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.generator.GeneratorTaskFactory;
+import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -39,6 +42,8 @@ import dev.waterdog.chunky.common.network.ChunkyPeer;
 import dev.waterdog.chunky.common.util.ChunkUtils;
 import dev.waterdog.chunky.nukkit.world.anvil.AnvilChunkBuilder;
 import io.netty.util.internal.PlatformDependent;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -120,6 +125,8 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
            BaseFullChunk baseChunk = this.level.getChunk(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), true);
            if (!baseChunk.isGenerated() || !baseChunk.isPopulated()) {
                this.getScheduler().scheduleTask(() -> this.onChunkReceived(chunkHolder, baseChunk), true);
+           } else if (baseChunk.isGenerated() && this.worldUpdater != null && this.worldUpdater.canChunkUpdate((BaseChunk) baseChunk)) {
+               this.onChunkUpdateReceived(chunkHolder);
            }
         });
     }
@@ -150,9 +157,7 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
 
     private void onChunkUpdateReceived(ChunkHolder chunkHolder) {
         log.info("Received chunk update x={} z={}", chunkHolder.getChunkX(), chunkHolder.getChunkZ());
-
-        BaseFullChunk chunk = this.level.getChunk(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), false);
-        if (chunk == null) {
+        if (!this.level.isChunkGenerated(chunkHolder.getChunkX(), chunkHolder.getChunkZ())) {
             return;
         }
 
@@ -161,12 +166,23 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
             return;
         }
 
+        Int2ObjectMap<ChunkSection> sections = new Int2ObjectOpenHashMap<>();
         for (SubChunkHolder subChunk : chunkHolder.getSubChunks()) {
             if (subChunk.getY() <= 0) {
-                chunkBuilder.buildChunkSection(chunk, subChunk, chunkHolder.getBlockPalette());
+                ChunkSection section = chunkBuilder.buildChunkSection(subChunk, chunkHolder.getBlockPalette());
+                sections.put(subChunk.getY(), section);
             }
         }
-        this.level.setChunk(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), chunk, false);
+
+        this.getScheduler().scheduleTask(() -> {
+            BaseChunk chunk = (BaseChunk) this.level.getChunk(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), false);
+            if (chunk == null) {
+                return;
+            }
+
+            sections.forEach(chunk::setSection);
+            this.level.setChunk(chunkHolder.getChunkX(), chunkHolder.getChunkZ(), chunk, false);
+        });
     }
 
     @Override
