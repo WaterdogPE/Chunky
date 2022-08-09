@@ -142,6 +142,9 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
     }
 
     private void onChunkReceived(ChunkHolder chunkHolder, BaseFullChunk baseChunk) {
+        if (this.getLevel().getProvider() == null) {
+            return;
+        }
         log.info("Received chunk x={} z={}", chunkHolder.getChunkX(), chunkHolder.getChunkZ());
 
         ChunkBuilder chunkBuilder = this.getChunkBuilder();
@@ -166,6 +169,10 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
     }
 
     private void onChunkUpdateReceived(ChunkHolder chunkHolder) {
+        if (this.getLevel().getProvider() == null) {
+            return;
+        }
+
         log.info("Received chunk update x={} z={}", chunkHolder.getChunkX(), chunkHolder.getChunkZ());
         if (!this.level.isChunkGenerated(chunkHolder.getChunkX(), chunkHolder.getChunkZ())) {
             return;
@@ -221,6 +228,10 @@ public class ChunkyManager implements ChunkyListener, GeneratorTaskFactory {
     }
 
     private void createBlockEntity(Vector3i position, CompoundTag nbt) {
+        if (this.level.getProvider() == null) {
+            return;
+        }
+
         BlockEntity blockEntity = this.level.getBlockEntity(new Vector3(position.getX(), position.getY(), position.getZ()));
         if (blockEntity != null && blockEntity.isValid()) {
             return;
