@@ -34,7 +34,7 @@ public class ChunkSerializer475 extends ChunkSerializer338 {
             }
 
             if (palette == null) {
-                palette = biomes[i - 1].clone();
+                palette = biomes[i - 1].copy();
             }
             biomes[i] = palette;
         }

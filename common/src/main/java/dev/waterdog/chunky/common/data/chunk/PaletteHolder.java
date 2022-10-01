@@ -15,11 +15,17 @@
 
 package dev.waterdog.chunky.common.data.chunk;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
-public class PaletteHolder implements Cloneable {
+@NoArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+public class PaletteHolder {
     private int paletteHeader;
     private int[] words;
     private IntList palette;
@@ -32,12 +38,9 @@ public class PaletteHolder implements Cloneable {
         return (this.paletteHeader & 0x01) == 0;
     }
 
-    @Override
-    public PaletteHolder clone() {
-        try {
-            return (PaletteHolder) super.clone();
-        } catch (CloneNotSupportedException e) {
-            return null;
-        }
+    public PaletteHolder copy() {
+        int[] words = new int[this.words.length];
+        System.arraycopy(this.words, 0, words, 0, words.length);
+        return new PaletteHolder(this.paletteHeader, words, new IntArrayList(this.palette));
     }
 }
