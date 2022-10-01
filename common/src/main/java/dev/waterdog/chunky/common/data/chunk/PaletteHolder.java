@@ -39,8 +39,10 @@ public class PaletteHolder {
     }
 
     public PaletteHolder copy() {
-        int[] words = new int[this.words.length];
-        System.arraycopy(this.words, 0, words, 0, words.length);
+        int[] words = null;
+        if (this.words != null) {
+            words = new int[this.words.length];
+        }
         return new PaletteHolder(this.paletteHeader, words, new IntArrayList(this.palette));
     }
 }
